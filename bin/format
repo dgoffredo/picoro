@@ -1,0 +1,7 @@
+#!/bin/sh
+
+set -e
+
+repo=$(dirname "$0")/..
+cd "$repo"
+find . -type f \( -name '*.h' -o -name '*.cpp' \) -print0 | xargs -0 clang-format --style=file -i
