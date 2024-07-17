@@ -1,5 +1,54 @@
 #pragma once
 
+// `class Coroutine<Value>` is a coroutine that `co_return`s a `Value`.  It's
+// what's called a "task" in other libraries.
+//
+// `Coroutine` is eagerly executed, so execution begins as soon as the
+// coroutine is invoked — there is no initial suspend.
+//
+// `Coroutine` doesn't actually do anything, since it doesn't know about the
+// scheduler that drives it.  It is meant to be used in conjunction with the
+// facilities provided by `sleep.h`, `tcp.h`, and `event_loop.h`.  Those
+// components explicitly involve `async_context_t`, which is what manages the
+// resumption of suspended `Coroutine`s.
+//
+// Use `Coroutine<Value>` as the return value of any function that includes
+// `co_await` or `co_return` statements.  For example:
+//
+//     #include <picoro/coroutine.h>
+//     #include <picoro/event_loop.h>
+//     #include <picoro/sleep.h>
+//
+//     #include <pico/async_context_poll.h>
+//
+//     #include <algorithm>
+//     #include <cassert>
+//     #include <chrono>
+//     #include <iostream>
+//     #include <string>
+//
+//     Coroutine<std::string> reverse_later(
+//         async_context_t *context,
+//         std::string text,
+//         std::chrono::seconds delay) {
+//       co_await picoro::sleep_for(context, delay);
+//       std::reverse(text.begin(), text.end());
+//       co_return text;
+//     }
+//
+//     Coroutine<void> drift_away(async_context_t *context) {
+//       for (auto delay = std::chrono::milliseconds(100); ; delay *= 2) {
+//         std::cout << co_await reverse_later(context, "tacocat", delay) << '\n';
+//       }
+//     }
+//
+//     int main() {
+//       async_context_poll_t context = {};
+//       const bool ok = async_context_poll_init_with_defaults(&context);
+//       assert(ok);
+//       picoro::run_event_loop(&context.core, drift_away(&context.core));
+//     }
+
 #include <coroutine>
 #include <cstddef>
 #include <cstdlib>
@@ -54,9 +103,7 @@ template <typename Ret>
 class Coroutine {
  public:
   struct Deleter {
-    void operator()(Promise<Ret> *promise) {
-      std::coroutine_handle<Promise<Ret>>::from_promise(*promise).destroy();
-    }
+    void operator()(Promise<Ret> *);
   };
 
   using promise_type = Promise<Ret>;  // required by the C++ coroutine protocol
@@ -180,6 +227,11 @@ class Awaiter<void> {
 
 // class Coroutine<Ret>
 // --------------------
+template <typename Ret>
+void Coroutine<Ret>::Deleter::operator()(Promise<Ret> *promise) {
+  std::coroutine_handle<Promise<Ret>>::from_promise(*promise).destroy();
+}
+
 template <typename Ret>
 inline Coroutine<Ret>::Coroutine(UniqueHandle promise)
     : promise_(std::move(promise)) {}

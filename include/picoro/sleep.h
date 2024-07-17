@@ -1,5 +1,11 @@
 #pragma once
 
+// `sleep_for(async_context_t*, std::chrono::microseconds)` returns an object
+// that can be awaited upon by the `co_await` operator.  Doing so suspends the
+// invoking coroutine and resumes it after the specified number of
+// microseconds. The resumption is scheduled using the specified
+// `async_context_t`.
+
 #include <pico/async_context.h>
 #include <pico/time.h>
 
