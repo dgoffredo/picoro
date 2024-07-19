@@ -132,8 +132,9 @@ picoro::Coroutine<bool> data_ready(const sensirion::SCD4x &sensor) {
   bool result;
   int rc = co_await sensor.get_data_ready_flag(&result);
   if (rc) {
-    debug("Unable to query whether the sensor has data ready. Error code %d.\n",
-          rc);
+    picoro::debug(
+        "Unable to query whether the sensor has data ready. Error code %d.\n",
+        rc);
     co_return false;
   }
   co_return result;
@@ -166,12 +167,14 @@ picoro::Coroutine<void> monitor_scd4x(async_context_t *context) {
 
   int rc = co_await sensor.set_automatic_self_calibration(0);
   if (rc) {
-    debug("Unable to disable automatic self-calibration. Error code %d.\n", rc);
+    picoro::debug(
+        "Unable to disable automatic self-calibration. Error code %d.\n", rc);
   }
 
   rc = co_await sensor.start_periodic_measurement();
   if (rc) {
-    debug("Unable to start periodic measurement mode. Error code %d.\n", rc);
+    picoro::debug("Unable to start periodic measurement mode. Error code %d.\n",
+                  rc);
   }
 
   for (;;) {
@@ -186,7 +189,7 @@ picoro::Coroutine<void> monitor_scd4x(async_context_t *context) {
     rc = co_await sensor.read_measurement(&co2_ppm, &temperature_millicelsius,
                                           &relative_humidity_millipercent);
     if (rc) {
-      debug("Unable to read sensor measurement. Error code %d.\n", rc);
+      picoro::debug("Unable to read sensor measurement. Error code %d.\n", rc);
     } else {
       printf("CO2: %hu ppm\ttemperature: ", co2_ppm);
       print_millis_as_decimal(temperature_millicelsius);
@@ -230,11 +233,11 @@ picoro::Coroutine<void> wifi_connect(async_context_t *context, const char *SSID,
   cyw43_wifi_pm(&cyw43_state, ultra_performance_giga_chad_power_mode);
   // cyw43_wifi_pm(&cyw43_state, CYW43_PERFORMANCE_PM);
 
-  debug("Connecting to WiFi...\n");
+  picoro::debug("Connecting to WiFi...\n");
   int rc =
       cyw43_arch_wifi_connect_async(SSID, password, CYW43_AUTH_WPA2_AES_PSK);
   if (rc) {
-    debug("Error connecting to wifi: %s.", pico_describe(rc));
+    picoro::debug("Error connecting to wifi: %s.", pico_describe(rc));
     // Blink a few times to show that there's a problem.
     co_await blink(context, 10, std::chrono::milliseconds(250));
     co_return;
@@ -243,21 +246,21 @@ picoro::Coroutine<void> wifi_connect(async_context_t *context, const char *SSID,
   for (;;) {
     const int wifi_status =
         cyw43_tcpip_link_status(&cyw43_state, CYW43_ITF_STA);
-    debug("WiFi status: %s\n", cyw43_describe(wifi_status));
+    picoro::debug("WiFi status: %s\n", cyw43_describe(wifi_status));
     if (wifi_status == CYW43_LINK_UP) {
       break;
     } else if (wifi_status == CYW43_LINK_FAIL) {
       // If we failed, then reset the adapter, wait a few seconds, and try
       // again.
       rc = cyw43_wifi_leave(&cyw43_state, CYW43_ITF_STA);
-      debug("Disassociating from WiFi network. rcode: %d\n", rc);
-      debug("Will retry WiFi in a few seconds.\n");
+      picoro::debug("Disassociating from WiFi network. rcode: %d\n", rc);
+      picoro::debug("Will retry WiFi in a few seconds.\n");
       co_await picoro::sleep_for(context, std::chrono::seconds(5));
-      debug("Connecting to WiFi...\n");
+      picoro::debug("Connecting to WiFi...\n");
       int rc = cyw43_arch_wifi_connect_async(SSID, password,
                                              CYW43_AUTH_WPA2_AES_PSK);
       if (rc) {
-        debug("Error connecting to wifi: %s.", pico_describe(rc));
+        picoro::debug("Error connecting to wifi: %s.", pico_describe(rc));
         // Blink a few times to show that there's a problem.
         co_await blink(context, 10, std::chrono::milliseconds(250));
         co_return;
@@ -267,7 +270,7 @@ picoro::Coroutine<void> wifi_connect(async_context_t *context, const char *SSID,
       rc = cyw43_arch_wifi_connect_async(SSID, password,
                                          CYW43_AUTH_WPA2_AES_PSK);
       if (rc) {
-        debug("Error connecting to wifi: %s.", pico_describe(rc));
+        picoro::debug("Error connecting to wifi: %s.", pico_describe(rc));
         // Blink a few times to show that there's a problem.
         co_await blink(context, 10, std::chrono::milliseconds(250));
         co_return;
@@ -276,27 +279,28 @@ picoro::Coroutine<void> wifi_connect(async_context_t *context, const char *SSID,
     co_await picoro::sleep_for(context, std::chrono::seconds(1));
   }
 
-  debug("Connected to WiFi.\n");
+  picoro::debug("Connected to WiFi.\n");
 }
 
 picoro::Coroutine<void> handle_client(picoro::Connection conn) {
-  debug("in handle_client(...), about to await recv()\n");
+  picoro::debug("in handle_client(...), about to await recv()\n");
   char recvbuf[2048];
   auto [count, err] = co_await conn.recv(recvbuf, sizeof recvbuf);
-  debug("in handle_client(...), received %d bytes with error %s\n", count,
-        picoro::lwip_describe(err));
+  picoro::debug("in handle_client(...), received %d bytes with error %s\n",
+                count, picoro::lwip_describe(err));
   if (err) {
-    debug(
+    picoro::debug(
         "in handle_client(...), since there was an error, I'm closing the "
         "connection and returning.\n");
     co_return;
   }
   std::array<char, max_response_length + 1> sendbuf;
-  debug("in handle_client(...), about to format response and await send()\n");
+  picoro::debug(
+      "in handle_client(...), about to format response and await send()\n");
   count = format_response(sendbuf, latest);
   std::tie(count, err) =
       co_await conn.send(std::string_view(sendbuf.data(), count));
-  debug(
+  picoro::debug(
       "handle_client(...), finished send(). Sent %d bytes with error %s. About "
       "to close and return.\n",
       count, picoro::lwip_describe(err));
@@ -307,21 +311,21 @@ picoro::Coroutine<void> http_server(int port, int listen_backlog) {
          ip4addr_ntoa(netif_ip4_addr(netif_list)), port);
   auto [listener, err] = picoro::listen(port, listen_backlog);
   if (err) {
-    debug("http_server: Error starting server: %s\n",
-          picoro::lwip_describe(err));
+    picoro::debug("http_server: Error starting server: %s\n",
+                  picoro::lwip_describe(err));
     co_return;
   }
-  debug("http_server: server started\n");
+  picoro::debug("http_server: server started\n");
 
   for (;;) {
-    debug("http_server: about to await accept()\n");
+    picoro::debug("http_server: about to await accept()\n");
     auto [conn, err] = co_await listener.accept();
     if (err) {
-      debug("http_server: Error accepting connection: %s\n",
-            picoro::lwip_describe(err));
+      picoro::debug("http_server: Error accepting connection: %s\n",
+                    picoro::lwip_describe(err));
       continue;
     }
-    debug("http_server: accept()ed a connection\n");
+    picoro::debug("http_server: accept()ed a connection\n");
     handle_client(std::move(conn)).detach();
   }
 }
@@ -345,9 +349,9 @@ int main() {
   stdio_init_all();
 
   async_context_poll_t context = {};
-  bool succeeded = async_context_poll_init_with_defaults(&context);
-  if (!succeeded) {
-    debug("Failed to initialize async_context_poll_t\n");
+  bool ok = async_context_poll_init_with_defaults(&context);
+  if (!ok) {
+    picoro::debug("Failed to initialize async_context_poll_t\n");
     return -2;
   }
 
@@ -356,7 +360,7 @@ int main() {
   cyw43_arch_set_async_context(&context.core);
   // 🇺🇸 🦅
   if (cyw43_arch_init_with_country(CYW43_COUNTRY_USA)) {
-    debug("failed to initialize WiFi\n");
+    picoro::debug("failed to initialize WiFi\n");
     return 1;
   }
 

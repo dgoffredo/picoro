@@ -98,8 +98,8 @@
 //       stdio_init_all();
 //
 //       async_context_poll_t context = {};
-//       const bool succeeded = async_context_poll_init_with_defaults(&context);
-//       assert(succeeded);
+//       const bool ok = async_context_poll_init_with_defaults(&context);
+//       assert(ok);
 //
 //       picoro::run_event_loop(&context.core, monitor_scd4x(&context.core));
 //

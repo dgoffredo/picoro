@@ -71,8 +71,8 @@
 //
 //     int main() {
 //       async_context_poll_t context = {};
-//       const bool succeeded = async_context_poll_init_with_defaults(&context);
-//       assert(succeeded);
+//       const bool ok = async_context_poll_init_with_defaults(&context);
+//       assert(ok);
 //
 //       cyw43_arch_set_async_context(&context.core);
 //       const int rc = cyw43_arch_init_with_country(CYW43_COUNTRY_USA); // 🇺🇸 🦅

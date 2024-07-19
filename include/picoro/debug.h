@@ -1,7 +1,7 @@
 #pragma once
 
-// `debug(...)` is a function-like macro that is `printf` in debug mode, and a
-// no-op in release mode.
+// `debug(...)` is a function that is a wrapper around `printf` in debug mode,
+// and a no-op in release mode.  It is a function, not a macro.
 //
 // The `NDEBUG` preprocessor macro determines the mode.
 //
@@ -10,18 +10,23 @@
 //     #include <picoro/debug.h>
 //
 //     int main() {
-//       debug("All %d arguments are not evaluated in %s mode.\n", 3, "release");
+//       picoro::debug("This only prints in %s mode.\n", "release");
 //     }
 
+namespace picoro {
+
 #ifdef NDEBUG
-#define debug(...) \
-  do {             \
-  } while (false)
+inline int debug(const char*, ...) { return 0; }
 #else
 #include <stdio.h>
-#define debug(...)       \
-  do {                   \
-    printf(__VA_ARGS__); \
-    fflush(stdout);      \
-  } while (false)
+// The use of a template will cause overloads to proliferate, but it's cleaner
+// than using <cstdarg> and will probably get inlined away.
+template <typename... Parameters>
+int debug(const char *format, Parameters... parameters) {
+  const int rc = printf(format, parameters...);
+  fflush(stdout);
+  return rc;
+}
 #endif
+
+}  // namespace picoro
