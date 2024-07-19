@@ -24,6 +24,7 @@
 //     #include <pico/stdlib.h>
 //     #include <stdio.h>
 //     #include <cassert>
+//     #include <coroutine>
 //
 //     picoro::Coroutine<bool> data_ready(const sensirion::SCD4x &sensor) {
 //       bool result;

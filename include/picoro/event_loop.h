@@ -11,7 +11,6 @@
 //
 //     #include <picoro/coroutine.h>
 //     #include <picoro/event_loop.h>
-//
 //     #include <pico/async_context_poll.h>
 //
 //     Coroutine<void> some_coroutine();

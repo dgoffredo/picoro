@@ -34,6 +34,7 @@
 //     #include <pico/async_context_poll.h>
 //     #include <pico/cyw43_arch.h>
 //     #include <cassert>
+//     #include <coroutine>
 //     #include <string_view>
 //     #include <tuple>
 //     #include <utility>
