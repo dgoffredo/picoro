@@ -5,6 +5,35 @@
 // Doing so suspends the invoking coroutine and resumes it after the specified
 // number of microseconds. The resumption is scheduled using the specified
 // `async_context_t`.
+//
+// Example usage:
+//
+//     #include <picoro/coroutine.h>
+//     #include <picoro/event_loop.h>
+//     #include <picoro/sleep.h>
+//
+//     #include <pico/async_context_poll.h>
+//     #include <pico/stdlib.h>
+//
+//     #include <cassert>
+//     #include <chrono>
+//     #include <iostream>
+//
+//     Coroutine<void> every_second(async_context_t *context) {
+//       for (int i = 0; i < 10; ++i) {
+//         co_await picoro::sleep_for(context, std::chrono::seconds(1));
+//         std::cout << i << ": here I am\n";
+//       }
+//     }
+//
+//     int main() {
+//       stdio_init_all();
+//       async_context_poll_t context = {};
+//       const bool ok = async_context_poll_init_with_defaults(&context);
+//       assert(ok);
+//       picoro::run_event_loop(&context.core, every_second(&context.core));
+//       // unreachable
+//     }
 
 #include <pico/async_context.h>
 #include <pico/time.h>

@@ -1,5 +1,7 @@
 #pragma once
 
+// TODO: document
+
 /*
  * This code is originally based on the following files:
  *

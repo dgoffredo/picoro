@@ -25,6 +25,7 @@
 //           &context.core,
 //           some_coroutine(),
 //           some_other_coroutine(&context.core));
+//       // unreachable
 //     }
 
 #include <pico/async_context.h>

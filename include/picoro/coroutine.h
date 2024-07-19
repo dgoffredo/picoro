@@ -65,6 +65,7 @@
 //       const bool ok = async_context_poll_init_with_defaults(&context);
 //       assert(ok);
 //       picoro::run_event_loop(&context.core, drift_away(&context.core));
+//       // unreachable
 //     }
 
 #include <coroutine>
