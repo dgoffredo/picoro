@@ -12,8 +12,8 @@
 // components explicitly involve `async_context_t`, which is what manages the
 // resumption of suspended `Coroutine`s.
 //
-// Use `Coroutine<Value>` as the return value of any function that includes
-// `co_await` or `co_return` statements.  For example:
+// Use `Coroutine<Value>` as the return value of any function that contains
+// `co_await` expressions or `co_return` statements.  For example:
 //
 //     #include <picoro/coroutine.h>
 //     #include <picoro/event_loop.h>
