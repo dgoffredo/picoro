@@ -98,29 +98,60 @@ sensing HTTP server on a single core.
 
 What
 ----
-TODO:
-- C++ header-only libraries that use:
-    - C++20 coroutines (`#include <coroutine>`)
-    - Pico C SDK
-      - `pico_stdlib` for standard C library functionality
-      - `hardware_i2c` for the SCD4x sensor driver
-      - `pico_async_context_poll` for scheduling suspended coroutines
-      - `pico_cyw43_arch_lwip_poll` for scheduling network event handlers
-      - `tcp.h` is a coroutine wrapper around lwIP's callback interface
-    - The C++ standard library (containers, algorithms, etc.)
-      - no explicit use of exceptions or of run-time type information
-- All that is implemented is a coroutine-aware `sleep_for` and a coroutine
-  wrapper around lwIP's `tcp_*` functions.
+Picoro is a header-only library of C++20 coroutine-compatible facilities for
+use with the Raspberry Pi Pico W.  Coroutines that use this library are
+intended to be scheduled by the Pico C SDK's `pico_async_context_poll` library.
+
+Picoro consists of the following, most of which live in `namespace picoro`:
+
+- [#include <picoro/coroutine.h>][15] defines `class Coroutine<Value>`, a
+  coroutine that `co_return`s a `Value`.  Use this as the return type of any
+  function containing `co_await` expressions or `co_return` statements.
+- [#include <picoro/sleep.h>][16] defines
+  `sleep_for(async_context_t*, std::chrono::microseconds)`.
+  `co_await sleep_for(context, delay)` will suspend the invoking coroutine for
+  the specified `delay` amount of time and then resume it using the specified
+  `context`.
+- [#include <picoro/event_loop.h>][17] defines
+  `run_event_loop(async_context_t*, Coroutines...)`.  `run_event_loop` is an
+  infinite loop that repeatedly polls the `async_context_t` for work to do,
+  sleeping when there is no work to do.  The `Coroutines...` are ignored; those
+  parameters exist as a convenient place for coroutine objects that must
+  outlive the event loop.
+- [#include <picoro/tcp.h>][18] defines coroutine adapters for the
+  callback-based lwIP library included in the Pico's C SDK.  It provides only
+  those facilities
+  needed to run a socket server:
+  - `class Listener` listens on all interfaces on a specified port, with a
+    specified backlog, and has an `accept()` member function that can be
+    `co_await`ed to obtain a tuple `(Connection, err_t)`.
+  - `class Connection` is an `accept()`ed connection that has
+    `send(std::string_view)` and `recv(char*, int)` member functions that can
+    be `co_await`ed to send and receive data, respectively, to and from the
+    client.
+- [#include <picoro/debug.h>][19] defines `debug`, which is a wrapper around
+  `printf` in debug builds, and a no-op in release builds.
+- [#include <picoro/drivers/scd4x.h>][20] is a driver for the Sensirion SCD40
+  and SCD41 CO₂ sensors.  It defines `struct sensirion::SCD4x`, whose member
+  functions can be `co_await`ed to interact with the sensor.
+- [examples/co2-server/][21] is an example program that motivated the writing
+  of this library.  It's an HTTP server that responds to all requests with the latest data read from an SCD41 CO₂ sensor.
 
 How
 ---
-TODO:
-- Include the `include/picoro` headers directly into your source
-- If you include `tcp.h`, you need to provide a `lwipopts.h` (see the example).
+Include the [include/picoro][22] headers directly into your source code.
+See [examples/co2-server/README.md][23].
+
+Your `CMakeLists.txt` might need to depend on the following libraries:
+
+- `pico_stdlib` for standard C library functionality
+- `hardware_i2c` for the SCD4x sensor driver
+- `pico_async_context_poll` for scheduling suspended coroutines
+- `pico_cyw43_arch_lwip_poll` for scheduling network event handlers
 
 More
 ----
-TODO: documentation at the top of header files
+Each header file is documented in a comment block at the beginning of the file.
 
 [1]: https://www.raspberrypi.com/documentation/microcontrollers/raspberry-pi-pico.html
 [2]: https://datasheets.raspberrypi.com/picow/pico-w-datasheet.pdf
@@ -136,3 +167,12 @@ TODO: documentation at the top of header files
 [12]: https://en.wikipedia.org/wiki/Single-board_microcontroller
 [13]: https://en.cppreference.com/w/cpp/language/coroutines
 [14]: https://github.com/FunMiles/PicoAsync
+[15]: include/picoro/coroutine.h
+[16]: include/picoro/sleep.h
+[17]: include/picoro/event_loop.h
+[18]: include/picoro/tcp.h
+[19]: include/picoro/debug.h
+[20]: include/picoro/drivers/scd4x.h
+[21]: examples/co2-server/
+[22]: include/picoro
+[23]: examples/co2-server/README.md
