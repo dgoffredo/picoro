@@ -1,5 +1,91 @@
 #pragma once
 
+// This component provides a socket-like coroutine facility for server-side TCP
+// connections.
+//
+// `class Listener` listens on all interfaces on a specified port with a
+// specified backlog.  A coroutine can `co_await` the listener's `accept()`
+// member function to get a tuple `(Connection, err_t)`, Go style. `err_t` is
+// zero (`ERR_OK`) if no error occurred.
+//
+// `class Connection` is a connection to a client.
+//
+// A coroutine can `co_await` the connection's `send(std::string_view)` member
+// function to send data to the client.  `send` returns a tuple `(int, err_t)`,
+// where the `int` is the number of bytes sent.  The `int` might be less than
+// the `std::string_view::size()` if an error occurred, i.e. if the `err_t` is
+// nonzero.
+//
+// A coroutine can `co_await` the connection's `recv(char*, int)` member
+// function to receive from the client up to `int` bytes into the buffer
+// pointed to by `char*`.  `recv` returns a tuple `(int, err_t)`, where the
+// `int` is the number of bytes received.  `recv` returns as soon as any data
+// is available, so the number of bytes received might be less than the number
+// of bytes requested, even if no error occurs.
+//
+// Both `Listener` and `Connection` have a member function `close()` that
+// closes the associated socket.  `close` is called in the objects' destructors
+// if it has not been called already.
+//
+// Example usage:
+//
+//     #include <picoro/coroutine.h>
+//     #include <picoro/tcp.h>
+//     #include <pico/async_context_poll.h>
+//     #include <pico/cyw43_arch.h>
+//     #include <cassert>
+//     #include <string_view>
+//     #include <tuple>
+//     #include <utility>
+//
+//     picoro::Coroutine<void> handle_client(picoro::Connection conn) {
+//       char recvbuf[2048];
+//       auto [count, err] = co_await conn.recv(recvbuf, sizeof recvbuf);
+//       if (err) {
+//         co_return;
+//       }
+//       const std::string_view response =
+//         "HTTP/1.1 200 OK\r\n"
+//         "Connection: close\r\n"
+//         "Content-Type: text/plain\r\n"
+//         "\r\n"
+//         "Hi!\n";
+//       std::tie(count, err) = co_await conn.send(response);
+//     }
+//
+//     picoro::Coroutine<void> http_server(int port, int listen_backlog) {
+//       auto [listener, err] = picoro::listen(port, listen_backlog);
+//       if (err) {
+//         co_return;
+//       }
+//
+//       for (;;) {
+//         auto [conn, err] = co_await listener.accept();
+//         if (err) {
+//           continue;
+//         }
+//         handle_client(std::move(conn)).detach();
+//       }
+//     }
+//
+//     int main() {
+//       async_context_poll_t context = {};
+//       const bool succeeded = async_context_poll_init_with_defaults(&context);
+//       assert(succeeded);
+//
+//       cyw43_arch_set_async_context(&context.core);
+//       const int rc = cyw43_arch_init_with_country(CYW43_COUNTRY_USA); // 🇺🇸 🦅
+//       assert(rc == 0);
+//
+//       const int port = 80;
+//       const int backlog = 1;
+//       picoro::run_event_loop(&context.core, http_server(port, backlog));
+//
+//       // unreachable
+//       cyw43_arch_deinit();
+//       async_context_deinit(&context.core);
+//     }
+
 #include <lwip/pbuf.h>
 #include <lwip/tcp.h>
 #include <picoro/debug.h>
@@ -404,7 +490,7 @@ inline err_t Connection::on_recv(void *user_data, tcp_pcb *, pbuf *buffer,
     // data the receiver requested.
     state->receivers.pop();
     receiver->continuation.resume();
-    tcp_recved(state->client_pcb, receiver->length);
+    tcp_recved(state->client_pcb, to_copy);
   }
   received.erase(0, i);
 
