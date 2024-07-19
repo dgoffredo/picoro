@@ -1,6 +1,113 @@
 #pragma once
 
-// TODO: document
+// This file contains a driver for the [Sensirion SCD40 and SCD41][1] CO₂
+// sensors.  It's based on Sensirion's [generic driver][2], but has been
+// modified for use with C++20 coroutines.
+//
+// `struct sensirion::SCD4x` represents a sensor.  It must be initialized with
+// an `async_context_t*`, which is used for sleeps, and other properties may be
+// set on its `device` data member, such as the `ic2_inst_t*` to which the
+// sensor is connected (`i2c0` or `i2c1`), the I²C address of the sensor, and
+// the I²C blocking `read_timeout` and `write_timeout`.
+//
+// `SCD4x` member functions can be `co_await`ed upon by a coroutine.  Each
+// member function returns a `uint16_t` error code that is zero (`NO_ERROR`) on
+// success and nonzero if an error occurred.
+//
+// Example usage:
+//
+//     #include <picoro/coroutine.h>
+//     #include <picoro/event_loop.h>
+//     #include <picoro/sleep.h>
+//     #include <picoro/drivers/scd4x.h>
+//     #include <pico/async_context_poll.h>
+//     #include <pico/stdlib.h>
+//     #include <stdio.h>
+//     #include <cassert>
+//
+//     picoro::Coroutine<bool> data_ready(const sensirion::SCD4x &sensor) {
+//       bool result;
+//       int rc = co_await sensor.get_data_ready_flag(&result);
+//       if (rc) {
+//         printf("Unable to query whether the sensor has data ready. Error code %d.\n", rc);
+//         co_return false;
+//       }
+//       co_return result;
+//     }
+//
+//     picoro::Coroutine<void> monitor_scd4x(async_context_t *context) {
+//       // I²C GPIO pins
+//       const uint sda_pin = 12;
+//       const uint scl_pin = 13;
+//       // I²C clock rate
+//       const uint clock_hz = 400 * 1000;
+//
+//       i2c_inst_t *const instance = i2c0;
+//       const uint actual_baudrate = i2c_init(instance, clock_hz);
+//       struct Guard {
+//         i2c_inst_t *const instance;
+//         ~Guard() {
+//           i2c_deinit(instance);
+//         }
+//       } guard{instance};
+//       printf("The actual I2C baudrate is %u Hz\n", actual_baudrate);
+//       gpio_set_function(sda_pin, GPIO_FUNC_I2C);
+//       gpio_set_function(scl_pin, GPIO_FUNC_I2C);
+//       gpio_pull_up(sda_pin);
+//       gpio_pull_up(scl_pin);
+//
+//       sensirion::SCD4x sensor{context};
+//       sensor.device.instance = instance;
+//
+//       int rc = co_await sensor.set_automatic_self_calibration(0);
+//       if (rc) {
+//         printf("Unable to disable automatic self-calibration. Error code %d.\n", rc);
+//         co_return;
+//       }
+//
+//       rc = co_await sensor.start_periodic_measurement();
+//       if (rc) {
+//         printf("Unable to start periodic measurement mode. Error code %d.\n", rc);
+//         co_return;
+//       }
+//
+//       for (;;) {
+//         co_await picoro::sleep_for(context, std::chrono::seconds(5));
+//         while (!co_await data_ready(sensor)) {
+//           co_await picoro::sleep_for(context, std::chrono::seconds(1));
+//         }
+//
+//         uint16_t co2_ppm;
+//         int32_t temperature_millicelsius;
+//         int32_t relative_humidity_millipercent;
+//         rc = co_await sensor.read_measurement(&co2_ppm, &temperature_millicelsius,
+//                                               &relative_humidity_millipercent);
+//         if (rc) {
+//           printf("Unable to read sensor measurement. Error code %d.\n", rc);
+//         } else {
+//           printf("CO2: %hu ppm\ttemperature: %d millicelsius\thumidity: %d millipercent\n",
+//             co2_ppm,
+//             temperature_millicelsius,
+//             relative_humidity_millipercent);
+//         }
+//       }
+//     }
+//
+//     int main() {
+//       stdio_init_all();
+//
+//       async_context_poll_t context = {};
+//       const bool succeeded = async_context_poll_init_with_defaults(&context);
+//       assert(succeeded);
+//
+//       picoro::run_event_loop(&context.core, monitor_scd4x(&context.core));
+//
+//       // unreachable
+//       async_context_deinit(&context.core);
+//     }
+//
+// [1]: https://developer.sensirion.com/products-support/scd4x-co2-sensor
+// [2]: https://github.com/Sensirion/embedded-i2c-scd4x/
 
 /*
  * This code is originally based on the following files:
