@@ -12,20 +12,36 @@
 // components explicitly involve `async_context_t`, which is what manages the
 // resumption of suspended `Coroutine`s.
 //
+// Call `Coroutine::detach()` to allow the coroutine's storage to outlive the
+// `Coroutine` object.  This is useful for "fire and forget" scenarios, such as
+// handling an `accept`ed TCP connection.  A detached coroutine's storage is
+// reclaimed when the coroutine finishes executing.  It is not possible to
+// `co_await` a return value from a detached coroutine.
+//
 // Use `Coroutine<Value>` as the return value of any function that contains
-// `co_await` expressions or `co_return` statements.  For example:
+// `co_await` expressions or `co_return` statements.
+//
+// Example usage:
 //
 //     #include <picoro/coroutine.h>
 //     #include <picoro/event_loop.h>
 //     #include <picoro/sleep.h>
 //
 //     #include <pico/async_context_poll.h>
+//     #include <pico/stdlib.h>
 //
 //     #include <algorithm>
 //     #include <cassert>
 //     #include <chrono>
 //     #include <iostream>
 //     #include <string>
+//
+//     Coroutine<void> every_second(async_context_t *context) {
+//       for (;;) {
+//         co_await picoro::sleep_for(context, std::chrono::seconds(1));
+//         std::cout << "every_second: here I am\n";
+//       }
+//     }
 //
 //     Coroutine<std::string> reverse_later(
 //         async_context_t *context,
@@ -37,12 +53,14 @@
 //     }
 //
 //     Coroutine<void> drift_away(async_context_t *context) {
+//       every_second(context).detach();
 //       for (auto delay = std::chrono::milliseconds(100); ; delay *= 2) {
 //         std::cout << co_await reverse_later(context, "tacocat", delay) << '\n';
 //       }
 //     }
 //
 //     int main() {
+//       stdio_init_all();
 //       async_context_poll_t context = {};
 //       const bool ok = async_context_poll_init_with_defaults(&context);
 //       assert(ok);
@@ -106,7 +124,7 @@ class Coroutine {
     void operator()(Promise<Ret> *);
   };
 
-  using promise_type = Promise<Ret>;  // required by the C++ coroutine protocol
+  using promise_type = Promise<Ret>;
   using UniqueHandle = std::unique_ptr<Promise<Ret>, Deleter>;
 
  private:
