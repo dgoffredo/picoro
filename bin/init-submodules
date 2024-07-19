@@ -1,0 +1,10 @@
+#!/bin/sh
+
+set -e
+
+repo=$(dirname "$0")/..
+cd "$repo"
+
+git submodule update --init
+cd examples/co2-server/pico-sdk
+git submodule update --init

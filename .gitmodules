@@ -1,0 +1,3 @@
+[submodule "examples/co2-server/pico-sdk"]
+	path = examples/co2-server/pico-sdk
+	url = https://github.com/raspberrypi/pico-sdk.git
