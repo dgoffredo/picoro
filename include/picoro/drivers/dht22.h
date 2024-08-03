@@ -210,19 +210,20 @@ class Sensor {
 // Implementations
 // ===============
 
-// Driver *core_context[]
-// ----------------------
+// Driver *driver_at_core[]
+// ------------------------
 // When a `Driver` is instantiated, it installs itself here via
-// `core_context[get_core_num()] = this;`.
+// `driver_at_core[get_core_num()] = this;`.
 // When a `Driver` is destroyed, it uninstalls itself via
-// `core_context[get_core_num()] = nullptr;`.
-inline Driver *core_context[2] = {};
+// `driver_at_core[get_core_num()] = nullptr;`.
+// Each CPU core can have at most one `Driver` at a time.
+inline Driver *driver_at_core[2] = {};
 
 // class Driver
 // ------------
 template <uint8_t which_dma_irq>
 void Driver::dma_irq_handler() {
-  Driver *driver = core_context[get_core_num()];
+  Driver *driver = driver_at_core[get_core_num()];
   if (driver == nullptr) {
     // TODO: spurious?
     return;
@@ -280,17 +281,17 @@ inline Driver::Driver(async_context_t *context, uint8_t which_dma_irq)
       which_dma_irq(which_dma_irq) {
   debug("dht22::Driver::Driver\n");
   // Here's the plan:
-  // - Register ourselves in `core_context`.
+  // - Register ourselves in `driver_at_core`.
   // - Register `worker` with `context`.
   // - Register the appropriate DMA IRQ handler.
 
   const uint core = get_core_num();
-  if (core_context[core]) {
+  if (driver_at_core[core]) {
     panic(
         "In dht22::Driver constructor: At most one Driver per core is "
         "allowed.");
   }
-  core_context[core] = this;
+  driver_at_core[core] = this;
 
   worker.do_work = &Driver::handle_ready_sensors;
   worker.user_data = this;
@@ -308,18 +309,18 @@ inline Driver::Driver(async_context_t *context, uint8_t which_dma_irq)
 Driver::~Driver() {
   debug("dht22::Driver::~Driver\n");
   // Undo what we did in the constructor:
-  // - Unregister ourselves in `core_context`.
+  // - Unregister ourselves in `driver_at_core`.
   // - Unregister `worker` with `context`.
   // - Unregister the DMA IRQ handler.
   // Also, remove the PIO program from the PIO devices if the program was
   // previously loaded there.
 
   const uint core = get_core_num();
-  if (core_context[core] != this) {
+  if (driver_at_core[core] != this) {
     panic(
         "In dht22::Driver destructor: At most one Driver per core is allowed.");
   }
-  core_context[core] = nullptr;
+  driver_at_core[core] = nullptr;
 
   async_context_remove_when_pending_worker(context, &worker);
 
