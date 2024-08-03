@@ -139,15 +139,28 @@ Picoro consists of the following, most of which live in `namespace picoro`:
 
 How
 ---
-Include the [include/picoro][22] headers directly into your source code.
-See [examples/co2-server/README.md][23].
+In CMake, `add_subdirectory(picoro)` and then add the appropriate `picoro_*`
+libraries to your `target_link_libraries`. See the CO2 server example's
+[CMakeLists.txt][22].
 
-Your `CMakeLists.txt` might need to depend on the following libraries:
+Each include file has a corresponding library target:
+
+- `picoro_coroutine` when you `#include <picoro/coroutine.h>`
+- `picoro_debug` when you `#include <picoro/debug.h>`
+- `picoro_drivers_scd4x` when you `#include <picoro/drivers/scd4x.h>`
+- `picoro_event_loop` when you `#include <picoro/event_loop.h>`
+- `picoro_sleep` when you `#include <picoro/sleep.h>`
+- `picoro_tcp` when you `#include <picoro/tcp.h>`
+
+Picoro is a header-only library, but its headers imply link dependencies that
+are named in the `picoro_*` targets. For example:
 
 - `pico_stdlib` for standard C library functionality
 - `hardware_i2c` for the SCD4x sensor driver
 - `pico_async_context_poll` for scheduling suspended coroutines
 - `pico_cyw43_arch_lwip_poll` for scheduling network event handlers
+
+See Picoro's [CMakeLists.txt][23] for more details.
 
 More
 ----
@@ -174,5 +187,5 @@ Each header file is documented in a comment block at the beginning of the file.
 [19]: include/picoro/debug.h
 [20]: include/picoro/drivers/scd4x.h
 [21]: examples/co2-server/
-[22]: include/picoro
-[23]: examples/co2-server/README.md
+[22]: examples/co2-server/CMakeLists.txt
+[23]: CMakeLists.txt

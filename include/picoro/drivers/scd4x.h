@@ -156,7 +156,6 @@
 #include <picoro/coroutine.h>
 #include <picoro/sleep.h>
 #include <stdint.h>
-#include <stdlib.h>
 
 #include <chrono>
 

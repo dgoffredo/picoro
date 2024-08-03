@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.12)
 
-set(PICO_BOARD "pico_w" CACHE STRING "The particular Raspberry Pi Pico board" FORCE)
-set(PICO_SDK_PATH "${CMAKE_CURRENT_SOURCE_DIR}/pico-sdk" CACHE PATH "Path to the Raspberry Pi Pico SDK" FORCE)
+set(PICO_BOARD "pico_w" CACHE STRING "The particular Raspberry Pi Pico board")
+set(PICO_SDK_PATH "${CMAKE_CURRENT_SOURCE_DIR}/pico-sdk" CACHE PATH "Path to the Raspberry Pi Pico SDK")
 
 include(${PICO_SDK_PATH}/pico_sdk_init.cmake)
 
@@ -15,23 +15,25 @@ pico_sdk_init()
 # Require -Wall cleanliness for all code, including SDK headers.
 add_compile_options(-Wall -Werror)
 
+add_subdirectory(picoro)
+
 add_executable(co2-server
         co2-server.cpp
         )
 
-# Enable C++20 coroutines (GCC 10 requires a flag) and stricter warnings for our C++ code only.
-set_source_files_properties(co2-server.cpp secrets.h lwipopts.h
-        PROPERTIES COMPILE_OPTIONS -fcoroutines -Wextra -pedantic)
-
 # Make our lwipopts.h visible to lwIP, which includes it.
 target_include_directories(co2-server PRIVATE
-        ${CMAKE_CURRENT_LIST_DIR}
+        ${CMAKE_CURRENT_LIST_DIR}/lwipopts
         )
 
 target_link_libraries(co2-server
-        hardware_i2c
-        pico_async_context_poll
-        pico_cyw43_arch_lwip_poll
+        picoro_coroutine
+        picoro_debug
+        picoro_drivers_scd4x
+        picoro_event_loop
+        picoro_sleep
+        picoro_tcp
+
         pico_stdlib
         )
 

@@ -1,5 +1,4 @@
 #include <pico/async_context_poll.h>
-#include <pico/binary_info.h>
 #include <pico/cyw43_arch.h>
 #include <pico/stdlib.h>
 #include <picoro/coroutine.h>

@@ -3,11 +3,14 @@ CO₂ Server
 This is an HTTP server that responds with JSON containing the CO₂ concentration
 recently read from an SCD41 sensor.
 
-Aside from [co2-server.cpp][1] and the [Picoro headers][2], the example depends
+Aside from [co2-server.cpp][1] and the [picoro library][2], the example depends
 on the Pico's C SDK, which is included as a git submodule.  To initialize the
 submodule, run [init-submodules][3].  You can also set the path to another
 installation of the C SDK by modifying the `PICO_SDK_PATH` variable in
 [CMakeLists.txt][4].
+
+Before building the example, modify [secrets.h][5] so that it contains your
+real WiFi SSID and password.
 
 Here's how to build the example in a `build/` directory at the root of this repository:
 ```console
@@ -65,20 +68,12 @@ $ curl --verbose --no-progress-meter 'http://192.168.1.101' | jq
   "sequence_number": 52738,
   "CO2_ppm": 613,
   "temperature_celsius": 27.324,
-  "relative_humidity_percent": 55.055,
-  "wifi_status_counts": [
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    1055323
-  ]
+  "relative_humidity_percent": 55.055
 }
 ```
 
 [1]: co2-server.cpp
-[2]: ../../include/picoro/
+[2]: ../../
 [3]: ../../bin/init-submodules
 [4]: CMakeLists.txt
+[5]: secrets.h
