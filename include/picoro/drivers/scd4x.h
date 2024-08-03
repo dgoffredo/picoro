@@ -163,78 +163,6 @@ namespace sensirion {
 
 constexpr uint16_t NO_ERROR = 0;
 
-namespace common {
-
-inline uint16_t bytes_to_uint16_t(const uint8_t* bytes) {
-  return (uint16_t)bytes[0] << 8 | (uint16_t)bytes[1];
-}
-
-inline uint32_t bytes_to_uint32_t(const uint8_t* bytes) {
-  return (uint32_t)bytes[0] << 24 | (uint32_t)bytes[1] << 16 |
-         (uint32_t)bytes[2] << 8 | (uint32_t)bytes[3];
-}
-
-inline int16_t bytes_to_int16_t(const uint8_t* bytes) {
-  return (int16_t)common::bytes_to_uint16_t(bytes);
-}
-
-inline int32_t bytes_to_int32_t(const uint8_t* bytes) {
-  return (int32_t)common::bytes_to_uint32_t(bytes);
-}
-
-inline float bytes_to_float(const uint8_t* bytes) {
-  union {
-    uint32_t u32_value;
-    float float32;
-  } tmp;
-
-  tmp.u32_value = common::bytes_to_uint32_t(bytes);
-  return tmp.float32;
-}
-
-inline void uint32_t_to_bytes(const uint32_t value, uint8_t* bytes) {
-  bytes[0] = value >> 24;
-  bytes[1] = value >> 16;
-  bytes[2] = value >> 8;
-  bytes[3] = value;
-}
-
-inline void uint16_t_to_bytes(const uint16_t value, uint8_t* bytes) {
-  bytes[0] = value >> 8;
-  bytes[1] = value;
-}
-
-inline void int32_t_to_bytes(const int32_t value, uint8_t* bytes) {
-  bytes[0] = value >> 24;
-  bytes[1] = value >> 16;
-  bytes[2] = value >> 8;
-  bytes[3] = value;
-}
-
-inline void int16_t_to_bytes(const int16_t value, uint8_t* bytes) {
-  bytes[0] = value >> 8;
-  bytes[1] = value;
-}
-
-inline void float_to_bytes(const float value, uint8_t* bytes) {
-  union {
-    uint32_t u32_value;
-    float float32;
-  } tmp;
-  tmp.float32 = value;
-  common::uint32_t_to_bytes(tmp.u32_value, bytes);
-}
-
-inline void copy_bytes(const uint8_t* source, uint8_t* destination,
-                       uint16_t data_length) {
-  uint16_t i;
-  for (i = 0; i < data_length; i++) {
-    destination[i] = source[i];
-  }
-}
-
-}  // namespace common
-
 namespace i2c {
 
 constexpr int8_t CRC_ERROR = 1;
@@ -339,116 +267,11 @@ inline int8_t check_crc(const uint8_t* data, uint16_t count, uint8_t checksum) {
   return NO_ERROR;
 }
 
-inline uint16_t fill_cmd_send_buf(uint8_t* buf, uint16_t cmd,
-                                  const uint16_t* args, uint8_t num_args) {
-  uint8_t i;
-  uint16_t idx = 0;
-
-  buf[idx++] = (uint8_t)((cmd & 0xFF00) >> 8);
-  buf[idx++] = (uint8_t)((cmd & 0x00FF) >> 0);
-
-  for (i = 0; i < num_args; ++i) {
-    buf[idx++] = (uint8_t)((args[i] & 0xFF00) >> 8);
-    buf[idx++] = (uint8_t)((args[i] & 0x00FF) >> 0);
-
-    uint8_t crc = generate_crc((uint8_t*)&buf[idx - 2], WORD_SIZE);
-    buf[idx++] = crc;
-  }
-  return idx;
-}
-
-inline int16_t read_words_as_bytes(const Device& device, uint8_t* data,
-                                   uint16_t num_words) {
-  int16_t ret;
-  uint16_t i, j;
-  uint16_t size = num_words * (WORD_SIZE + CRC8_LEN);
-  uint16_t word_buf[MAX_BUFFER_WORDS];
-  uint8_t* const buf8 = (uint8_t*)word_buf;
-
-  ret = device.read(buf8, size);
-  if (ret != NO_ERROR) return ret;
-
-  /* check the CRC for each word */
-  for (i = 0, j = 0; i < size; i += WORD_SIZE + CRC8_LEN) {
-    ret = check_crc(&buf8[i], WORD_SIZE, buf8[i + WORD_SIZE]);
-    if (ret != NO_ERROR) return ret;
-
-    data[j++] = buf8[i];
-    data[j++] = buf8[i + 1];
-  }
-
-  return NO_ERROR;
-}
-
-inline int16_t read_words(const Device& device, uint16_t* data_words,
-                          uint16_t num_words) {
-  int16_t ret;
-  uint8_t i;
-
-  ret = read_words_as_bytes(device, (uint8_t*)data_words, num_words);
-  if (ret != NO_ERROR) return ret;
-
-  for (i = 0; i < num_words; ++i) {
-    const uint8_t* word_bytes = (uint8_t*)&data_words[i];
-    data_words[i] = ((uint16_t)word_bytes[0] << 8) | word_bytes[1];
-  }
-
-  return NO_ERROR;
-}
-
-inline int16_t write_cmd(const Device& device, uint16_t command) {
-  uint8_t buf[COMMAND_SIZE];
-
-  fill_cmd_send_buf(buf, command, NULL, 0);
-  return device.write(buf, COMMAND_SIZE);
-}
-
-inline int16_t write_cmd_with_args(const Device& device, uint16_t command,
-                                   const uint16_t* data_words,
-                                   uint16_t num_words) {
-  uint8_t buf[MAX_BUFFER_WORDS];
-  uint16_t buf_size;
-
-  buf_size = fill_cmd_send_buf(buf, command, data_words, num_words);
-  return device.write(buf, buf_size);
-}
-
-inline int16_t read_cmd(const Device& device, uint16_t cmd,
-                        uint16_t* data_words, uint16_t num_words) {
-  int16_t ret;
-  uint8_t buf[COMMAND_SIZE];
-
-  fill_cmd_send_buf(buf, cmd, NULL, 0);
-  ret = device.write(buf, COMMAND_SIZE);
-  if (ret != NO_ERROR) return ret;
-
-  return read_words(device, data_words, num_words);
-}
-
 inline uint16_t add_command_to_buffer(uint8_t* buffer, uint16_t offset,
                                       uint16_t command) {
   buffer[offset++] = (uint8_t)((command & 0xFF00) >> 8);
   buffer[offset++] = (uint8_t)((command & 0x00FF) >> 0);
   return offset;
-}
-
-inline uint16_t add_uint32_t_to_buffer(uint8_t* buffer, uint16_t offset,
-                                       uint32_t data) {
-  buffer[offset++] = (uint8_t)((data & 0xFF000000) >> 24);
-  buffer[offset++] = (uint8_t)((data & 0x00FF0000) >> 16);
-  buffer[offset] = generate_crc(&buffer[offset - WORD_SIZE], WORD_SIZE);
-  offset++;
-  buffer[offset++] = (uint8_t)((data & 0x0000FF00) >> 8);
-  buffer[offset++] = (uint8_t)((data & 0x000000FF) >> 0);
-  buffer[offset] = generate_crc(&buffer[offset - WORD_SIZE], WORD_SIZE);
-  offset++;
-
-  return offset;
-}
-
-inline uint16_t add_int32_t_to_buffer(uint8_t* buffer, uint16_t offset,
-                                      int32_t data) {
-  return add_uint32_t_to_buffer(buffer, offset, (uint32_t)data);
 }
 
 inline uint16_t add_uint16_t_to_buffer(uint8_t* buffer, uint16_t offset,
@@ -457,51 +280,6 @@ inline uint16_t add_uint16_t_to_buffer(uint8_t* buffer, uint16_t offset,
   buffer[offset++] = (uint8_t)((data & 0x00FF) >> 0);
   buffer[offset] = generate_crc(&buffer[offset - WORD_SIZE], WORD_SIZE);
   offset++;
-
-  return offset;
-}
-
-inline uint16_t add_int16_t_to_buffer(uint8_t* buffer, uint16_t offset,
-                                      int16_t data) {
-  return add_uint16_t_to_buffer(buffer, offset, (uint16_t)data);
-}
-
-inline uint16_t add_float_to_buffer(uint8_t* buffer, uint16_t offset,
-                                    float data) {
-  union {
-    uint32_t uint32_data;
-    float float_data;
-  } convert;
-
-  convert.float_data = data;
-
-  buffer[offset++] = (uint8_t)((convert.uint32_data & 0xFF000000) >> 24);
-  buffer[offset++] = (uint8_t)((convert.uint32_data & 0x00FF0000) >> 16);
-  buffer[offset] = generate_crc(&buffer[offset - WORD_SIZE], WORD_SIZE);
-  offset++;
-  buffer[offset++] = (uint8_t)((convert.uint32_data & 0x0000FF00) >> 8);
-  buffer[offset++] = (uint8_t)((convert.uint32_data & 0x000000FF) >> 0);
-  buffer[offset] = generate_crc(&buffer[offset - WORD_SIZE], WORD_SIZE);
-  offset++;
-
-  return offset;
-}
-
-inline uint16_t add_bytes_to_buffer(uint8_t* buffer, uint16_t offset,
-                                    uint8_t* data, uint16_t data_length) {
-  uint16_t i;
-
-  if (data_length % WORD_SIZE != 0) {
-    return BYTE_NUM_ERROR;
-  }
-
-  for (i = 0; i < data_length; i += 2) {
-    buffer[offset++] = data[i];
-    buffer[offset++] = data[i + 1];
-
-    buffer[offset] = generate_crc(&buffer[offset - WORD_SIZE], WORD_SIZE);
-    offset++;
-  }
 
   return offset;
 }
@@ -588,6 +366,8 @@ struct SCD4x {
   picoro::Coroutine<int16_t> measure_single_shot_rht_only() const;
   picoro::Coroutine<int16_t> power_down() const;
   picoro::Coroutine<int16_t> wake_up() const;
+
+  static uint16_t bytes_to_uint16_t(const uint8_t*);
 };
 
 inline SCD4x::SCD4x(async_context_t* context) : context(context) {}
@@ -624,9 +404,9 @@ inline picoro::Coroutine<int16_t> SCD4x::read_measurement_ticks(
   if (error) {
     co_return error;
   }
-  *co2 = common::bytes_to_uint16_t(&buffer[0]);
-  *temperature = common::bytes_to_uint16_t(&buffer[2]);
-  *humidity = common::bytes_to_uint16_t(&buffer[4]);
+  *co2 = bytes_to_uint16_t(&buffer[0]);
+  *temperature = bytes_to_uint16_t(&buffer[2]);
+  *humidity = bytes_to_uint16_t(&buffer[4]);
   co_return NO_ERROR;
 }
 
@@ -678,7 +458,7 @@ inline picoro::Coroutine<int16_t> SCD4x::get_temperature_offset_ticks(
   if (error) {
     co_return error;
   }
-  *t_offset = common::bytes_to_uint16_t(&buffer[0]);
+  *t_offset = bytes_to_uint16_t(&buffer[0]);
   co_return NO_ERROR;
 }
 
@@ -736,7 +516,7 @@ inline picoro::Coroutine<int16_t> SCD4x::get_sensor_altitude(
   if (error) {
     co_return error;
   }
-  *sensor_altitude = common::bytes_to_uint16_t(&buffer[0]);
+  *sensor_altitude = bytes_to_uint16_t(&buffer[0]);
   co_return NO_ERROR;
 }
 
@@ -795,7 +575,7 @@ inline picoro::Coroutine<int16_t> SCD4x::perform_forced_recalibration(
   if (error) {
     co_return error;
   }
-  *frc_correction = common::bytes_to_uint16_t(&buffer[0]);
+  *frc_correction = bytes_to_uint16_t(&buffer[0]);
   co_return NO_ERROR;
 }
 
@@ -817,7 +597,7 @@ inline picoro::Coroutine<int16_t> SCD4x::get_automatic_self_calibration(
   if (error) {
     co_return error;
   }
-  *asc_enabled = common::bytes_to_uint16_t(&buffer[0]);
+  *asc_enabled = bytes_to_uint16_t(&buffer[0]);
   co_return NO_ERROR;
 }
 
@@ -866,7 +646,7 @@ inline picoro::Coroutine<int16_t> SCD4x::get_data_ready_flag(
   if (error) {
     co_return error;
   }
-  local_data_ready = common::bytes_to_uint16_t(&buffer[0]);
+  local_data_ready = bytes_to_uint16_t(&buffer[0]);
   *data_ready_flag = (local_data_ready & 0x07FF) != 0;
   co_return NO_ERROR;
 }
@@ -903,9 +683,9 @@ inline picoro::Coroutine<int16_t> SCD4x::get_serial_number(
   if (error) {
     co_return error;
   }
-  *serial_0 = common::bytes_to_uint16_t(&buffer[0]);
-  *serial_1 = common::bytes_to_uint16_t(&buffer[2]);
-  *serial_2 = common::bytes_to_uint16_t(&buffer[4]);
+  *serial_0 = bytes_to_uint16_t(&buffer[0]);
+  *serial_1 = bytes_to_uint16_t(&buffer[2]);
+  *serial_2 = bytes_to_uint16_t(&buffer[4]);
   co_return NO_ERROR;
 }
 
@@ -927,7 +707,7 @@ inline picoro::Coroutine<int16_t> SCD4x::perform_self_test(
   if (error) {
     co_return error;
   }
-  *sensor_status = common::bytes_to_uint16_t(&buffer[0]);
+  *sensor_status = bytes_to_uint16_t(&buffer[0]);
   co_return NO_ERROR;
 }
 
@@ -1010,6 +790,10 @@ inline picoro::Coroutine<int16_t> SCD4x::wake_up() const {
   (void)i2c::write_data(device, &buffer[0], offset);
   co_await picoro::sleep_for(context, std::chrono::microseconds(20000));
   co_return NO_ERROR;
+}
+
+inline uint16_t SCD4x::bytes_to_uint16_t(const uint8_t* bytes) {
+  return (uint16_t)bytes[0] << 8 | (uint16_t)bytes[1];
 }
 
 }  // namespace sensirion
