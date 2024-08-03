@@ -102,7 +102,7 @@ Picoro is a header-only library of C++20 coroutine-compatible facilities for
 use with the Raspberry Pi Pico W.  Coroutines that use this library are
 intended to be scheduled by the Pico C SDK's `pico_async_context_poll` library.
 
-Picoro consists of the following, most of which live in `namespace picoro`:
+Picoro consists of the following, all of which live in `namespace picoro`:
 
 - [#include <picoro/coroutine.h>][15] defines `class Coroutine<Value>`, a
   coroutine that `co_return`s a `Value`.  Use this as the return type of any
@@ -134,6 +134,10 @@ Picoro consists of the following, most of which live in `namespace picoro`:
 - [#include <picoro/drivers/scd4x.h>][20] is a driver for the Sensirion SCD40
   and SCD41 CO₂ sensors.  It defines `struct sensirion::SCD4x`, whose member
   functions can be `co_await`ed to interact with the sensor.
+- [#include <picoro/drivers/dht22.h>][24] is a driver for the DHT22 (a.k.a.
+  AM2302) temperature and humidity sensor.  It defines `class dht22::Driver`,
+  from which `class dht22::Sensor` instances can be made.  `dht22::Sensor` has
+  a member function that can be `co_await`ed to interact with the sensor.
 - [examples/co2-server/][21] is an example program that motivated the writing
   of this library.  It's an HTTP server that responds to all requests with the latest data read from an SCD41 CO₂ sensor.
 
@@ -147,6 +151,7 @@ Each include file has a corresponding library target:
 
 - `picoro_coroutine` when you `#include <picoro/coroutine.h>`
 - `picoro_debug` when you `#include <picoro/debug.h>`
+- `picoro_drivers_dht22` when you `#include <picoro/drivers/dht22.h>`
 - `picoro_drivers_scd4x` when you `#include <picoro/drivers/scd4x.h>`
 - `picoro_event_loop` when you `#include <picoro/event_loop.h>`
 - `picoro_sleep` when you `#include <picoro/sleep.h>`
@@ -157,6 +162,8 @@ are named in the `picoro_*` targets. For example:
 
 - `pico_stdlib` for standard C library functionality
 - `hardware_i2c` for the SCD4x sensor driver
+- `hardware_pio`, `hardware_dma`, and `hardware_clocks` for the DHT22 sensor
+  driver
 - `pico_async_context_poll` for scheduling suspended coroutines
 - `pico_cyw43_arch_lwip_poll` for scheduling network event handlers
 
@@ -189,3 +196,4 @@ Each header file is documented in a comment block at the beginning of the file.
 [21]: examples/co2-server/
 [22]: examples/co2-server/CMakeLists.txt
 [23]: CMakeLists.txt
+[24]: include/picoro/drivers/dht22.h

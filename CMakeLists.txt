@@ -2,9 +2,9 @@ project(picoro CXX C ASM)
 
 add_library(picoro_headers INTERFACE)
 target_include_directories(picoro_headers INTERFACE include)
-# Enable coroutines (GCC 10 requires a flag).
 
 add_library(picoro_coroutine INTERFACE)
+# Enable coroutines (GCC 10 requires a flag).
 target_compile_options(picoro_coroutine INTERFACE $<$<COMPILE_LANGUAGE:CXX>:-fcoroutines>)
 target_link_libraries(picoro_coroutine INTERFACE
   picoro_headers
@@ -43,4 +43,14 @@ target_link_libraries(picoro_drivers_scd4x INTERFACE
   picoro_coroutine
   picoro_sleep
   hardware_i2c
+)
+
+add_library(picoro_drivers_dht22 INTERFACE)
+pico_generate_pio_header(picoro_drivers_dht22 ${CMAKE_CURRENT_LIST_DIR}/include/picoro/drivers/dht22.pio)
+target_link_libraries(picoro_drivers_dht22 INTERFACE
+  picoro_headers
+  picoro_coroutine
+  hardware_clocks
+  hardware_dma
+  hardware_pio
 )
