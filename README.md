@@ -140,6 +140,9 @@ Picoro consists of the following, all of which live in `namespace picoro`:
   a member function that can be `co_await`ed to interact with the sensor.
 - [examples/co2-server/][21] is an example program that motivated the writing
   of this library.  It's an HTTP server that responds to all requests with the latest data read from an SCD41 CO₂ sensor.
+- [examples/fridge-monitor/][25] is an example program that prints lines of
+  JSON containing the current temperature and relative humidity as measured by
+  three DHT22 sensors connected to the Pico's GPIO pins.
 
 How
 ---
@@ -197,3 +200,4 @@ Each header file is documented in a comment block at the beginning of the file.
 [22]: examples/co2-server/CMakeLists.txt
 [23]: CMakeLists.txt
 [24]: include/picoro/drivers/dht22.h
+[25]: examples/fridge-monitor/

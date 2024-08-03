@@ -2,9 +2,13 @@
 
 set -e
 
-repo=$(dirname "$0")/..
-cd "$repo"
+cd "$(dirname "$0")/.."
+repo=$(pwd)
 
 git submodule update --init
-cd examples/co2-server/pico-sdk
-git submodule update --init
+
+for sub in examples/co2-server/pico-sdk examples/fridge-monitor/pico-sdk; do
+  cd "$sub"
+  git submodule update --init
+  cd "$repo"
+done
