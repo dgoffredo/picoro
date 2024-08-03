@@ -20,17 +20,14 @@ screen:
 ```console
 $ pwd
 /home/david/src/picoro
-
+$ bin/init-submodules
+[...]
 $ mkdir build
-
 $ cd build
-
 $ cmake ../examples/fridge-monitor
 [...]
-
 $ make -j
 [...]
-
 $ ls -l
 total 1472
 -rw-rw-r-- 1 david david  20827 Aug  3 00:19 CMakeCache.txt
@@ -48,12 +45,9 @@ drwxrwxr-x 3 david david   4096 Aug  3 00:19 generated
 drwxrwxr-x 3 david david   4096 Aug  3 00:19 picoro
 drwxrwxr-x 6 david david   4096 Aug  3 00:19 pico-sdk
 drwxrwxr-x 3 david david   4096 Aug  3 00:19 pioasm
-
 $ cp fridge-monitor.uf2 /media/"$USER"/RPI-RP2
-
 $ ls /dev/ttyACM*
 /dev/ttyACM0
-
 $ screen /dev/ttyACM0
 {"sensor": "bottom shelf", "celsius": 27.3, "humidity_percent": 54.7}
 {"sensor": "top shelf", "celsius": 27.2, "humidity_percent": 54.7}
@@ -68,7 +62,6 @@ $ screen /dev/ttyACM0
 {"sensor": "top shelf", "celsius": 27.2, "humidity_percent": 54.7}
 {"sensor": "middle shelf", "celsius": 27.7, "humidity_percent": 54.7}
 ^ad
-
 [detached from 120450.pts-1.carbon]
 ```
 
