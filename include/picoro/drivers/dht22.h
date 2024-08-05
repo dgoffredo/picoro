@@ -57,11 +57,11 @@
 // measurements:
 //
 //     picoro::Coroutine<void> monitor_sensor(
-//         async_context_t *context, Sensor& sensor) {
+//         async_context_t *context, picoro::dht22::Sensor& sensor) {
 //       for (;;) {
 //         co_await picoro::sleep_for(std::chrono::seconds(2));
 //         float celsius, humidity_percent;
-//         const int rc = co_await sensor.measure(&celsius, &humidity_percent);
+//         const auto rc = co_await sensor.measure(&celsius, &humidity_percent);
 //         if (rc == 0) {
 //           std::printf("%.1f C, %.1f%% humidity\n", celsius, humidity_percent);
 //         }
@@ -70,10 +70,18 @@
 //
 // `Sensor` has a member function
 // `measure(float *celsius, float *humidity_percent)` that a coroutine can
-// `co_await` to obtain an `int` error code. If the returned `int` is zero,
-// then the measurement succeeded; `*celsius` and `*humidity_percent` will
-// contain the current temperature and humidity, respectively. If the returned
-// `int` is nonzero, then the received data did not match its checksum.
+// `co_await` to obtain a result code. If the returned result code is zero
+// (`Sensor::OK`), then the measurement succeeded; `*celsius` and
+// `*humidity_percent` will contain the current temperature and humidity,
+// respectively. If the returned result code is nonzero, then its value
+// indicates the error:
+//
+// - `Sensor::FAILED_CHECKSUM`: The sensor's response was corrupted.
+// - `Sensor::TIMEOUT`: The sensor did not respond in time.
+//
+// When an error occurs, you might want to reset the sensor to return it to a
+// known state. `Sensor` has a member function, `reset()`, that is equivalent
+// to destroying the `Sensor` and then creating it again.
 //
 // Here's a complete example:
 //
@@ -98,8 +106,11 @@
 //       for (;;) {
 //         co_await picoro::sleep_for(ctx, std::chrono::seconds(2));
 //         float celsius, humidity_percent;
-//         const int rc = co_await sensor.measure(&celsius, &humidity_percent);
-//         if (rc == 0) {
+//         const auto rc = co_await sensor.measure(&celsius, &humidity_percent);
+//         if (rc) {
+//           std::printf("error: %s\n", picoro::dht22::Sensor::describe(rc));
+//           sensor.reset();
+//         } else {
 //           std::printf("%s: %.1f C, %.1f%% humidity\n", name, celsius,
 //                   humidity_percent);
 //         }
