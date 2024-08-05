@@ -133,6 +133,7 @@
 #include <hardware/dma.h>
 #include <hardware/gpio.h>
 #include <pico/async_context.h>
+#include <pico/time.h>
 #include <picoro/coroutine.h>
 #include <picoro/debug.h>
 #include <picoro/sleep.h>
@@ -141,6 +142,7 @@
 #include <array>
 #include <chrono>
 #include <coroutine>
+#include <new>
 
 #include "dht22.pio.h"
 
@@ -184,6 +186,7 @@ class Sensor {
   uint8_t state_machine : 2;
   uint8_t dma_channel : 4;
   bool ready : 1;
+  uint8_t gpio_pin : 5;  // only needed for reset()
   std::coroutine_handle<> continuation;
   Driver *driver;
 
@@ -197,7 +200,12 @@ class Sensor {
   Sensor(const Sensor &) = delete;
   Sensor(Sensor &&) = delete;
 
-  Coroutine<int> measure(float *celsius, float *humidity_percent);
+  enum Result { OK, FAILED_CHECKSUM, TIMEOUT };
+  static const char *describe(Result);
+
+  Coroutine<Result> measure(float *celsius, float *humidity_percent);
+
+  void reset();
 
  private:
   PIO get_pio() const;
@@ -352,7 +360,7 @@ inline int Driver::load(PIO pio) {
 // class Sensor
 // ------------
 inline Sensor::Sensor(Driver *driver, PIO pio, int gpio_pin)
-    : data(), ready(false), driver(driver) {
+    : data(), ready(false), gpio_pin(gpio_pin), driver(driver) {
   debug("dht22::Sensor::Sensor\n");
   const auto slot =
       std::find(driver->sensors.begin(), driver->sensors.end(), nullptr);
@@ -437,7 +445,13 @@ inline PIO Sensor::get_pio() const { return which_pio ? pio1 : pio0; }
 
 inline void Sensor::set_pio(PIO pio) { which_pio = (pio == pio1); }
 
-inline Coroutine<int> Sensor::measure(float *celsius, float *humidity_percent) {
+inline const char *Sensor::describe(Result result) {
+  const char *const descriptions[] = {"ok", "failed checksum", "timeout"};
+  return descriptions[result];
+}
+
+inline Coroutine<Sensor::Result> Sensor::measure(float *celsius,
+                                                 float *humidity_percent) {
   // Push some counters to the state machine. It will put them in its x and y
   // registers. We pack them together as two 16-bit values in one 32-bit
   // word.
@@ -450,24 +464,64 @@ inline Coroutine<int> Sensor::measure(float *celsius, float *humidity_percent) {
 
   struct Awaiter {
     Sensor *sensor;
+    async_at_time_worker_t timeout;
+    bool timed_out = false;
 
     bool await_ready() {
       // If the transfer is done, then we don't need to suspend.
-      // This assumes that the transfer has already begun.
-      // It's also very unlikely to be done, since we just poked the
+      // It's very unlikely to be done, since we just poked the
       // state machine with `pio_sm_put` above.
-      return !dma_channel_is_busy(sensor->dma_channel);
+      if (sensor->ready) {
+        sensor->ready = false;
+        return true;
+      }
+      return false;
     }
 
     bool await_suspend(std::coroutine_handle<> continuation) {
+      // Similar logic as in `await_ready`, but the meaning of the return value
+      // is the opposite.
+      if (sensor->ready) {
+        sensor->ready = false;
+        return false;
+      }
       sensor->continuation = continuation;
+      timeout.do_work = &Awaiter::on_timeout;
+      timeout.user_data = this;
+      // 7000 microseconds is more than enough time for a longest-case
+      // transmission.
+      // I base this on the data sheet. Taking the worst case timings for
+      // everything except the request duration (which I take to be 1 ms), the
+      // longest that a measurement can take in microseconds is:
+      //
+      //     1000 + 200 + 85 + 85 + (55 + 75)*40 + 55  =  6625
+      (void)async_context_add_at_time_worker_at(
+          sensor->driver->context, &timeout, make_timeout_time_us(7000));
       return true;
     }
 
-    void await_resume() {}
+    Sensor::Result await_resume() {
+      if (timed_out) {
+        return Sensor::Result::TIMEOUT;
+      }
+      (void)async_context_remove_at_time_worker(sensor->driver->context,
+                                                &timeout);
+      return Sensor::Result::OK;
+    }
+
+    static void on_timeout(async_context_t *, async_at_time_worker_t *worker) {
+      auto *awaiter = static_cast<Awaiter *>(worker->user_data);
+      if (auto continuation = awaiter->sensor->continuation) {
+        awaiter->timed_out = true;
+        awaiter->sensor->continuation = nullptr;
+        continuation.resume();
+      }
+    }
   };
 
-  co_await Awaiter{this};
+  if (Result result = co_await Awaiter{this}) {
+    co_return result;
+  }
 
   const uint8_t expected_checksum = data[4];
   const uint8_t calculated_checksum = data[0] + data[1] + data[2] + data[3];
@@ -480,7 +534,21 @@ inline Coroutine<int> Sensor::measure(float *celsius, float *humidity_percent) {
   const bool trigger = true;
   dma_channel_set_write_addr(dma_channel, data.data(), trigger);
 
-  co_return calculated_checksum != expected_checksum;
+  if (calculated_checksum != expected_checksum) {
+    co_return FAILED_CHECKSUM;
+  }
+  co_return OK;
+}
+
+inline void Sensor::reset() {
+  // Save local copies of the data members needed for the constructor:
+  // Sensor::Sensor(Driver *driver, PIO pio, int gpio_pin)
+  Driver *driver = this->driver;
+  PIO pio = get_pio();
+  int gpio_pin = this->gpio_pin;
+
+  this->~Sensor();
+  new (this) Sensor(driver, pio, gpio_pin);
 }
 
 inline float Sensor::decode_temperature(uint8_t b0, uint8_t b1) {

@@ -18,20 +18,24 @@
 picoro::Coroutine<void> monitor_sensor(async_context_t *ctx,
                                        picoro::dht22::Driver *driver, PIO pio,
                                        uint8_t gpio_pin, const char *name) {
-  picoro::dht22::Sensor sensor(driver, pio, gpio_pin);
+  using Sensor = picoro::dht22::Sensor;
+  Sensor sensor(driver, pio, gpio_pin);
   for (;;) {
     co_await picoro::sleep_for(ctx, std::chrono::seconds(2));
     float celsius, humidity_percent;
-    const int rc = co_await sensor.measure(&celsius, &humidity_percent);
-    if (rc == 0) {
-      std::printf(
-          "{"
-          "\"sensor\": \"%s\", "
-          "\"celsius\": %.1f, "
-          "\"humidity_percent\": %.1f"
-          "}\n",
-          name, celsius, humidity_percent);
+    if (Sensor::Result rc =
+            co_await sensor.measure(&celsius, &humidity_percent)) {
+      std::printf("{\"error\": \"%s\"}\n", Sensor::describe(rc));
+      sensor.reset();
+      continue;
     }
+    std::printf(
+        "{"
+        "\"sensor\": \"%s\", "
+        "\"celsius\": %.1f, "
+        "\"humidity_percent\": %.1f"
+        "}\n",
+        name, celsius, humidity_percent);
   }
 }
 
