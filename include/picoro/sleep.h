@@ -69,8 +69,8 @@ namespace picoro {
 struct Sleep {
   async_context_t *context;
   absolute_time_t deadline;
-  async_at_time_worker_t worker;
-  std::coroutine_handle<> continuation;
+  async_at_time_worker_t worker = {};
+  std::coroutine_handle<> continuation = nullptr;
 
   bool await_ready();
   void await_suspend(std::coroutine_handle<> continuation);

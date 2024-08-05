@@ -464,7 +464,7 @@ inline Coroutine<Sensor::Result> Sensor::measure(float *celsius,
 
   struct Awaiter {
     Sensor *sensor;
-    async_at_time_worker_t timeout;
+    async_at_time_worker_t timeout = {};
     bool timed_out = false;
 
     bool await_ready() {
