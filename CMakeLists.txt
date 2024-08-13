@@ -37,8 +37,16 @@ target_link_libraries(picoro_tcp INTERFACE
   pico_cyw43_arch_lwip_poll
 )
 
-add_library(picoro_drivers_scd4x INTERFACE)
-target_link_libraries(picoro_drivers_scd4x INTERFACE
+add_library(picoro_drivers_sensirion_scd4x INTERFACE)
+target_link_libraries(picoro_drivers_sensirion_scd4x INTERFACE
+  picoro_headers
+  picoro_coroutine
+  picoro_sleep
+  hardware_i2c
+)
+
+add_library(picoro_drivers_sensirion_sht3x INTERFACE)
+target_link_libraries(picoro_drivers_sensirion_sht3x INTERFACE
   picoro_headers
   picoro_coroutine
   picoro_sleep
