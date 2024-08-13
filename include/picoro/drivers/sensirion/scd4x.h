@@ -5,14 +5,17 @@
 // modified for use with C++20 coroutines.
 //
 // `struct sensirion::SCD4x` represents a sensor.  It must be initialized with
-// an `async_context_t*`, which is used for sleeps, and other properties may be
+// an `async_context_t*`, which is used for sleeps.  Other properties may be
 // set on its `device` data member, such as the `ic2_inst_t*` to which the
 // sensor is connected (`i2c0` or `i2c1`), the I²C address of the sensor, and
 // the I²C blocking `read_timeout` and `write_timeout`.
 //
 // `SCD4x` member functions can be `co_await`ed upon by a coroutine.  Each
-// member function returns a `uint16_t` error code that is zero (`NO_ERROR`) on
-// success and nonzero if an error occurred.
+// member function returns a `uint16_t` error code that is zero on success and
+// nonzero if an error occurred.
+//
+// When including this header file, also name `picoro_devices_sensirion_scd4x`
+// as a link library in your build configuration.
 //
 // Example usage:
 //
@@ -111,14 +114,11 @@
 // [2]: https://github.com/Sensirion/embedded-i2c-scd4x/
 
 /*
- * This code is originally based on the following files:
+ * This code is originally based on the following file:
  *
  * - <https://github.com/Sensirion/embedded-i2c-scd4x/blob/3b413b9c804dd7c4df11178e9cf2501b6f61fa2e/scd4x_i2c.c>
- * - <https://github.com/Sensirion/embedded-i2c-scd4x/blob/3b413b9c804dd7c4df11178e9cf2501b6f61fa2e/sensirion_common.c>
- * - <https://github.com/Sensirion/embedded-i2c-scd4x/blob/3b413b9c804dd7c4df11178e9cf2501b6f61fa2e/sensirion_i2c.c>
- * - <https://github.com/Sensirion/embedded-i2c-scd4x/blob/3b413b9c804dd7c4df11178e9cf2501b6f61fa2e/sensirion_i2c_hal.c>
  *
- * The copyright notice for those files is reproduced below.
+ * The copyright notice for that file is reproduced below.
  *
  * --------------------------------------------------------------------------
  *
@@ -154,225 +154,69 @@
 
 #include <hardware/i2c.h>
 #include <picoro/coroutine.h>
+#include <picoro/drivers/sensirion/i2c.h>
 #include <picoro/sleep.h>
 #include <stdint.h>
 
 #include <chrono>
 
+namespace picoro {
 namespace sensirion {
-
-constexpr uint16_t NO_ERROR = 0;
-
-namespace i2c {
-
-constexpr int8_t CRC_ERROR = 1;
-constexpr uint16_t BYTE_NUM_ERROR = 4;
-
-constexpr uint8_t CRC8_POLYNOMIAL = 0x31;
-constexpr uint8_t CRC8_INIT = 0xFF;
-constexpr uint16_t CRC8_LEN = 1;
-
-constexpr unsigned COMMAND_SIZE = 2;
-constexpr unsigned WORD_SIZE = 2;
-constexpr unsigned MAX_BUFFER_WORDS = 32;
-
-struct Device {
-  i2c_inst_t* instance = i2c0;
-  uint8_t address = 0x62;
-  std::chrono::microseconds read_timeout = std::chrono::microseconds(1000);
-  std::chrono::microseconds write_timeout = std::chrono::microseconds(1000);
-
-  /**
-   * Execute one read transaction on the I2C bus, reading a given number of
-   * bytes. If the device does not acknowledge the read command, return an
-   * error.
-   *
-   * @param data    pointer to the buffer where the data is to be stored
-   * @param count   number of bytes to read from I2C and store in the buffer
-   * @returns 0 on success, error code otherwise
-   */
-  int8_t read(uint8_t* data, uint16_t count) const;
-
-  /**
-   * Execute one write transaction on the I2C bus, sending a given number of
-   * bytes. The bytes in the supplied buffer must be sent to the given address.
-   * If the slave device does not acknowledge any of the bytes, return an error.
-   *
-   * @param data    pointer to the buffer containing the data to write
-   * @param count   number of bytes to read from the buffer and send over I2C
-   * @returns 0 on success, error code otherwise
-   */
-  int8_t write(const uint8_t* data, uint16_t count) const;
-};
-
-inline int8_t Device::read(uint8_t* data, uint16_t count) const {
-  const bool nostop = true;  // master retains control of the bus after the read
-  const unsigned timeout_μs = read_timeout / std::chrono::microseconds(1);
-  const int rc =
-      i2c_read_timeout_us(instance, address, data, count, nostop, timeout_μs);
-  switch (rc) {
-    case PICO_ERROR_GENERIC:  // address not acknowledged
-    case PICO_ERROR_TIMEOUT:  // device didn't respond in time
-      return rc;
-    default:
-      // `rc` is the number of bytes read. If it's what we wanted (`count`),
-      // good. If not, bad.
-      if (rc == count) {
-        return NO_ERROR;
-      }
-      return PICO_ERROR_NO_DATA;
-  }
-}
-
-inline int8_t Device::write(const uint8_t* data, uint16_t count) const {
-  const bool nostop =
-      true;  // master retains control of the bus after the write
-  const unsigned timeout_μs = write_timeout / std::chrono::microseconds(1);
-  const int rc =
-      i2c_write_timeout_us(instance, address, data, count, nostop, timeout_μs);
-  switch (rc) {
-    case PICO_ERROR_GENERIC:  // address not acknowledged
-    case PICO_ERROR_TIMEOUT:  // device didn't respond in time
-      return rc;
-    default:
-      // `rc` is the number of bytes written. If it's what we wanted (`count`),
-      // good. If not, bad.
-      if (rc == count) {
-        return NO_ERROR;
-      }
-      return PICO_ERROR_IO;
-  }
-}
-
-inline uint8_t generate_crc(const uint8_t* data, uint16_t count) {
-  uint16_t current_byte;
-  uint8_t crc = CRC8_INIT;
-  uint8_t crc_bit;
-
-  /* calculates 8-Bit checksum with given polynomial */
-  for (current_byte = 0; current_byte < count; ++current_byte) {
-    crc ^= (data[current_byte]);
-    for (crc_bit = 8; crc_bit > 0; --crc_bit) {
-      if (crc & 0x80)
-        crc = (crc << 1) ^ CRC8_POLYNOMIAL;
-      else
-        crc = (crc << 1);
-    }
-  }
-  return crc;
-}
-
-inline int8_t check_crc(const uint8_t* data, uint16_t count, uint8_t checksum) {
-  if (generate_crc(data, count) != checksum) return CRC_ERROR;
-  return NO_ERROR;
-}
-
-inline uint16_t add_command_to_buffer(uint8_t* buffer, uint16_t offset,
-                                      uint16_t command) {
-  buffer[offset++] = (uint8_t)((command & 0xFF00) >> 8);
-  buffer[offset++] = (uint8_t)((command & 0x00FF) >> 0);
-  return offset;
-}
-
-inline uint16_t add_uint16_t_to_buffer(uint8_t* buffer, uint16_t offset,
-                                       uint16_t data) {
-  buffer[offset++] = (uint8_t)((data & 0xFF00) >> 8);
-  buffer[offset++] = (uint8_t)((data & 0x00FF) >> 0);
-  buffer[offset] = generate_crc(&buffer[offset - WORD_SIZE], WORD_SIZE);
-  offset++;
-
-  return offset;
-}
-
-inline int16_t write_data(const Device& device, const uint8_t* data,
-                          uint16_t data_length) {
-  return device.write(data, data_length);
-}
-
-inline int16_t read_data_inplace(const Device& device, uint8_t* buffer,
-                                 uint16_t expected_data_length) {
-  int16_t error;
-  uint16_t i, j;
-  uint16_t size = (expected_data_length / WORD_SIZE) * (WORD_SIZE + CRC8_LEN);
-
-  if (expected_data_length % WORD_SIZE != 0) {
-    return BYTE_NUM_ERROR;
-  }
-
-  error = device.read(buffer, size);
-  if (error) {
-    return error;
-  }
-
-  for (i = 0, j = 0; i < size; i += WORD_SIZE + CRC8_LEN) {
-    error = check_crc(&buffer[i], WORD_SIZE, buffer[i + WORD_SIZE]);
-    if (error) {
-      return error;
-    }
-    buffer[j++] = buffer[i];
-    buffer[j++] = buffer[i + 1];
-  }
-
-  return NO_ERROR;
-}
-
-}  // namespace i2c
 
 struct SCD4x {
   async_context_t* context;
   i2c::Device device;
 
-  explicit SCD4x(async_context_t*);
-  SCD4x() = delete;
+  explicit SCD4x(async_context_t*, uint8_t i2c_address = 0x62);
 
-  picoro::Coroutine<int16_t> start_periodic_measurement() const;
-  picoro::Coroutine<int16_t> read_measurement_ticks(uint16_t* co2,
+  Coroutine<int16_t> start_periodic_measurement() const;
+  Coroutine<int16_t> read_measurement_ticks(uint16_t* co2,
                                                     uint16_t* temperature,
                                                     uint16_t* humidity) const;
-  picoro::Coroutine<int16_t> read_measurement(
+  Coroutine<int16_t> read_measurement(
       uint16_t* co2, int32_t* temperature_m_deg_c,
       int32_t* humidity_m_percent_rh) const;
-  picoro::Coroutine<int16_t> stop_periodic_measurement() const;
-  picoro::Coroutine<int16_t> get_temperature_offset_ticks(
+  Coroutine<int16_t> stop_periodic_measurement() const;
+  Coroutine<int16_t> get_temperature_offset_ticks(
       uint16_t* t_offset) const;
-  picoro::Coroutine<int16_t> get_temperature_offset(
+  Coroutine<int16_t> get_temperature_offset(
       int32_t* t_offset_m_deg_c) const;
-  picoro::Coroutine<int16_t> set_temperature_offset_ticks(
+  Coroutine<int16_t> set_temperature_offset_ticks(
       uint16_t t_offset) const;
-  picoro::Coroutine<int16_t> set_temperature_offset(
+  Coroutine<int16_t> set_temperature_offset(
       int32_t t_offset_m_deg_c) const;
-  picoro::Coroutine<int16_t> get_sensor_altitude(
+  Coroutine<int16_t> get_sensor_altitude(
       uint16_t* sensor_altitude) const;
-  picoro::Coroutine<int16_t> set_sensor_altitude(
+  Coroutine<int16_t> set_sensor_altitude(
       uint16_t sensor_altitude) const;
-  picoro::Coroutine<int16_t> set_ambient_pressure(
+  Coroutine<int16_t> set_ambient_pressure(
       uint16_t ambient_pressure) const;
-  picoro::Coroutine<int16_t> perform_forced_recalibration(
+  Coroutine<int16_t> perform_forced_recalibration(
       uint16_t target_co2_concentration, uint16_t* frc_correction) const;
-  picoro::Coroutine<int16_t> get_automatic_self_calibration(
+  Coroutine<int16_t> get_automatic_self_calibration(
       uint16_t* asc_enabled) const;
-  picoro::Coroutine<int16_t> set_automatic_self_calibration(
+  Coroutine<int16_t> set_automatic_self_calibration(
       uint16_t asc_enabled) const;
-  picoro::Coroutine<int16_t> start_low_power_periodic_measurement() const;
-  picoro::Coroutine<int16_t> get_data_ready_flag(bool* data_ready_flag) const;
-  picoro::Coroutine<int16_t> persist_settings() const;
-  picoro::Coroutine<int16_t> get_serial_number(uint16_t* serial_0,
+  Coroutine<int16_t> start_low_power_periodic_measurement() const;
+  Coroutine<int16_t> get_data_ready_flag(bool* data_ready_flag) const;
+  Coroutine<int16_t> persist_settings() const;
+  Coroutine<int16_t> get_serial_number(uint16_t* serial_0,
                                                uint16_t* serial_1,
                                                uint16_t* serial_2) const;
-  picoro::Coroutine<int16_t> perform_self_test(uint16_t* sensor_status) const;
-  picoro::Coroutine<int16_t> perform_factory_reset() const;
-  picoro::Coroutine<int16_t> reinit() const;
-  picoro::Coroutine<int16_t> measure_single_shot() const;
-  picoro::Coroutine<int16_t> measure_single_shot_rht_only() const;
-  picoro::Coroutine<int16_t> power_down() const;
-  picoro::Coroutine<int16_t> wake_up() const;
-
-  static uint16_t bytes_to_uint16_t(const uint8_t*);
+  Coroutine<int16_t> perform_self_test(uint16_t* sensor_status) const;
+  Coroutine<int16_t> perform_factory_reset() const;
+  Coroutine<int16_t> reinit() const;
+  Coroutine<int16_t> measure_single_shot() const;
+  Coroutine<int16_t> measure_single_shot_rht_only() const;
+  Coroutine<int16_t> power_down() const;
+  Coroutine<int16_t> wake_up() const;
 };
 
-inline SCD4x::SCD4x(async_context_t* context) : context(context) {}
+inline SCD4x::SCD4x(async_context_t* context, uint8_t i2c_address) : context(context) {
+  device.address = i2c_address;
+}
 
-inline picoro::Coroutine<int16_t> SCD4x::start_periodic_measurement() const {
+inline Coroutine<int16_t> SCD4x::start_periodic_measurement() const {
   int16_t error;
   uint8_t buffer[2];
   uint16_t offset = 0;
@@ -382,11 +226,11 @@ inline picoro::Coroutine<int16_t> SCD4x::start_periodic_measurement() const {
   if (error) {
     co_return error;
   }
-  co_await picoro::sleep_for(context, std::chrono::microseconds(1000));
-  co_return NO_ERROR;
+  co_await sleep_for(context, std::chrono::microseconds(1000));
+  co_return 0;
 }
 
-inline picoro::Coroutine<int16_t> SCD4x::read_measurement_ticks(
+inline Coroutine<int16_t> SCD4x::read_measurement_ticks(
     uint16_t* co2, uint16_t* temperature, uint16_t* humidity) const {
   int16_t error;
   uint8_t buffer[9];
@@ -398,19 +242,19 @@ inline picoro::Coroutine<int16_t> SCD4x::read_measurement_ticks(
     co_return error;
   }
 
-  co_await picoro::sleep_for(context, std::chrono::microseconds(1000));
+  co_await sleep_for(context, std::chrono::microseconds(1000));
 
   error = i2c::read_data_inplace(device, &buffer[0], 6);
   if (error) {
     co_return error;
   }
-  *co2 = bytes_to_uint16_t(&buffer[0]);
-  *temperature = bytes_to_uint16_t(&buffer[2]);
-  *humidity = bytes_to_uint16_t(&buffer[4]);
-  co_return NO_ERROR;
+  *co2 = i2c::bytes_to_uint16_t(&buffer[0]);
+  *temperature = i2c::bytes_to_uint16_t(&buffer[2]);
+  *humidity = i2c::bytes_to_uint16_t(&buffer[4]);
+  co_return 0;
 }
 
-inline picoro::Coroutine<int16_t> SCD4x::read_measurement(
+inline Coroutine<int16_t> SCD4x::read_measurement(
     uint16_t* co2, int32_t* temperature_m_deg_c,
     int32_t* humidity_m_percent_rh) const {
   int16_t error;
@@ -423,10 +267,10 @@ inline picoro::Coroutine<int16_t> SCD4x::read_measurement(
   }
   *temperature_m_deg_c = ((21875 * (int32_t)temperature) >> 13) - 45000;
   *humidity_m_percent_rh = ((12500 * (int32_t)humidity) >> 13);
-  co_return NO_ERROR;
+  co_return 0;
 }
 
-inline picoro::Coroutine<int16_t> SCD4x::stop_periodic_measurement() const {
+inline Coroutine<int16_t> SCD4x::stop_periodic_measurement() const {
   int16_t error;
   uint8_t buffer[2];
   uint16_t offset = 0;
@@ -436,11 +280,11 @@ inline picoro::Coroutine<int16_t> SCD4x::stop_periodic_measurement() const {
   if (error) {
     co_return error;
   }
-  co_await picoro::sleep_for(context, std::chrono::microseconds(500000));
-  co_return NO_ERROR;
+  co_await sleep_for(context, std::chrono::microseconds(500000));
+  co_return 0;
 }
 
-inline picoro::Coroutine<int16_t> SCD4x::get_temperature_offset_ticks(
+inline Coroutine<int16_t> SCD4x::get_temperature_offset_ticks(
     uint16_t* t_offset) const {
   int16_t error;
   uint8_t buffer[3];
@@ -452,17 +296,17 @@ inline picoro::Coroutine<int16_t> SCD4x::get_temperature_offset_ticks(
     co_return error;
   }
 
-  co_await picoro::sleep_for(context, std::chrono::microseconds(1000));
+  co_await sleep_for(context, std::chrono::microseconds(1000));
 
   error = i2c::read_data_inplace(device, &buffer[0], 2);
   if (error) {
     co_return error;
   }
-  *t_offset = bytes_to_uint16_t(&buffer[0]);
-  co_return NO_ERROR;
+  *t_offset = i2c::bytes_to_uint16_t(&buffer[0]);
+  co_return 0;
 }
 
-inline picoro::Coroutine<int16_t> SCD4x::get_temperature_offset(
+inline Coroutine<int16_t> SCD4x::get_temperature_offset(
     int32_t* t_offset_m_deg_c) const {
   int16_t error;
   uint16_t t_offset;
@@ -472,10 +316,10 @@ inline picoro::Coroutine<int16_t> SCD4x::get_temperature_offset(
     co_return error;
   }
   *t_offset_m_deg_c = ((21875 * (int32_t)t_offset) >> 13);
-  co_return NO_ERROR;
+  co_return 0;
 }
 
-inline picoro::Coroutine<int16_t> SCD4x::set_temperature_offset_ticks(
+inline Coroutine<int16_t> SCD4x::set_temperature_offset_ticks(
     uint16_t t_offset) const {
   int16_t error;
   uint8_t buffer[5];
@@ -488,17 +332,17 @@ inline picoro::Coroutine<int16_t> SCD4x::set_temperature_offset_ticks(
   if (error) {
     co_return error;
   }
-  co_await picoro::sleep_for(context, std::chrono::microseconds(1000));
-  co_return NO_ERROR;
+  co_await sleep_for(context, std::chrono::microseconds(1000));
+  co_return 0;
 }
 
-inline picoro::Coroutine<int16_t> SCD4x::set_temperature_offset(
+inline Coroutine<int16_t> SCD4x::set_temperature_offset(
     int32_t t_offset_m_deg_c) const {
   uint16_t t_offset = (uint16_t)((t_offset_m_deg_c * 12271) >> 15);
   co_return co_await set_temperature_offset_ticks(t_offset);
 }
 
-inline picoro::Coroutine<int16_t> SCD4x::get_sensor_altitude(
+inline Coroutine<int16_t> SCD4x::get_sensor_altitude(
     uint16_t* sensor_altitude) const {
   int16_t error;
   uint8_t buffer[3];
@@ -510,17 +354,17 @@ inline picoro::Coroutine<int16_t> SCD4x::get_sensor_altitude(
     co_return error;
   }
 
-  co_await picoro::sleep_for(context, std::chrono::microseconds(1000));
+  co_await sleep_for(context, std::chrono::microseconds(1000));
 
   error = i2c::read_data_inplace(device, &buffer[0], 2);
   if (error) {
     co_return error;
   }
-  *sensor_altitude = bytes_to_uint16_t(&buffer[0]);
-  co_return NO_ERROR;
+  *sensor_altitude = i2c::bytes_to_uint16_t(&buffer[0]);
+  co_return 0;
 }
 
-inline picoro::Coroutine<int16_t> SCD4x::set_sensor_altitude(
+inline Coroutine<int16_t> SCD4x::set_sensor_altitude(
     uint16_t sensor_altitude) const {
   int16_t error;
   uint8_t buffer[5];
@@ -533,11 +377,11 @@ inline picoro::Coroutine<int16_t> SCD4x::set_sensor_altitude(
   if (error) {
     co_return error;
   }
-  co_await picoro::sleep_for(context, std::chrono::microseconds(1000));
-  co_return NO_ERROR;
+  co_await sleep_for(context, std::chrono::microseconds(1000));
+  co_return 0;
 }
 
-inline picoro::Coroutine<int16_t> SCD4x::set_ambient_pressure(
+inline Coroutine<int16_t> SCD4x::set_ambient_pressure(
     uint16_t ambient_pressure) const {
   int16_t error;
   uint8_t buffer[5];
@@ -550,11 +394,11 @@ inline picoro::Coroutine<int16_t> SCD4x::set_ambient_pressure(
   if (error) {
     co_return error;
   }
-  co_await picoro::sleep_for(context, std::chrono::microseconds(1000));
-  co_return NO_ERROR;
+  co_await sleep_for(context, std::chrono::microseconds(1000));
+  co_return 0;
 }
 
-inline picoro::Coroutine<int16_t> SCD4x::perform_forced_recalibration(
+inline Coroutine<int16_t> SCD4x::perform_forced_recalibration(
     uint16_t target_co2_concentration, uint16_t* frc_correction) const {
   int16_t error;
   uint8_t buffer[5];
@@ -569,17 +413,17 @@ inline picoro::Coroutine<int16_t> SCD4x::perform_forced_recalibration(
     co_return error;
   }
 
-  co_await picoro::sleep_for(context, std::chrono::microseconds(400000));
+  co_await sleep_for(context, std::chrono::microseconds(400000));
 
   error = i2c::read_data_inplace(device, &buffer[0], 2);
   if (error) {
     co_return error;
   }
-  *frc_correction = bytes_to_uint16_t(&buffer[0]);
-  co_return NO_ERROR;
+  *frc_correction = i2c::bytes_to_uint16_t(&buffer[0]);
+  co_return 0;
 }
 
-inline picoro::Coroutine<int16_t> SCD4x::get_automatic_self_calibration(
+inline Coroutine<int16_t> SCD4x::get_automatic_self_calibration(
     uint16_t* asc_enabled) const {
   int16_t error;
   uint8_t buffer[3];
@@ -591,17 +435,17 @@ inline picoro::Coroutine<int16_t> SCD4x::get_automatic_self_calibration(
     co_return error;
   }
 
-  co_await picoro::sleep_for(context, std::chrono::microseconds(1000));
+  co_await sleep_for(context, std::chrono::microseconds(1000));
 
   error = i2c::read_data_inplace(device, &buffer[0], 2);
   if (error) {
     co_return error;
   }
-  *asc_enabled = bytes_to_uint16_t(&buffer[0]);
-  co_return NO_ERROR;
+  *asc_enabled = i2c::bytes_to_uint16_t(&buffer[0]);
+  co_return 0;
 }
 
-inline picoro::Coroutine<int16_t> SCD4x::set_automatic_self_calibration(
+inline Coroutine<int16_t> SCD4x::set_automatic_self_calibration(
     uint16_t asc_enabled) const {
   int16_t error;
   uint8_t buffer[5];
@@ -614,11 +458,11 @@ inline picoro::Coroutine<int16_t> SCD4x::set_automatic_self_calibration(
   if (error) {
     co_return error;
   }
-  co_await picoro::sleep_for(context, std::chrono::microseconds(1000));
-  co_return NO_ERROR;
+  co_await sleep_for(context, std::chrono::microseconds(1000));
+  co_return 0;
 }
 
-inline picoro::Coroutine<int16_t> SCD4x::start_low_power_periodic_measurement()
+inline Coroutine<int16_t> SCD4x::start_low_power_periodic_measurement()
     const {
   uint8_t buffer[2];
   uint16_t offset = 0;
@@ -627,7 +471,7 @@ inline picoro::Coroutine<int16_t> SCD4x::start_low_power_periodic_measurement()
   co_return i2c::write_data(device, &buffer[0], offset);
 }
 
-inline picoro::Coroutine<int16_t> SCD4x::get_data_ready_flag(
+inline Coroutine<int16_t> SCD4x::get_data_ready_flag(
     bool* data_ready_flag) const {
   int16_t error;
   uint8_t buffer[3];
@@ -640,18 +484,18 @@ inline picoro::Coroutine<int16_t> SCD4x::get_data_ready_flag(
     co_return error;
   }
 
-  co_await picoro::sleep_for(context, std::chrono::microseconds(1000));
+  co_await sleep_for(context, std::chrono::microseconds(1000));
 
   error = i2c::read_data_inplace(device, &buffer[0], 2);
   if (error) {
     co_return error;
   }
-  local_data_ready = bytes_to_uint16_t(&buffer[0]);
+  local_data_ready = i2c::bytes_to_uint16_t(&buffer[0]);
   *data_ready_flag = (local_data_ready & 0x07FF) != 0;
-  co_return NO_ERROR;
+  co_return 0;
 }
 
-inline picoro::Coroutine<int16_t> SCD4x::persist_settings() const {
+inline Coroutine<int16_t> SCD4x::persist_settings() const {
   int16_t error;
   uint8_t buffer[2];
   uint16_t offset = 0;
@@ -661,11 +505,11 @@ inline picoro::Coroutine<int16_t> SCD4x::persist_settings() const {
   if (error) {
     co_return error;
   }
-  co_await picoro::sleep_for(context, std::chrono::microseconds(800000));
-  co_return NO_ERROR;
+  co_await sleep_for(context, std::chrono::microseconds(800000));
+  co_return 0;
 }
 
-inline picoro::Coroutine<int16_t> SCD4x::get_serial_number(
+inline Coroutine<int16_t> SCD4x::get_serial_number(
     uint16_t* serial_0, uint16_t* serial_1, uint16_t* serial_2) const {
   int16_t error;
   uint8_t buffer[9];
@@ -677,19 +521,19 @@ inline picoro::Coroutine<int16_t> SCD4x::get_serial_number(
     co_return error;
   }
 
-  co_await picoro::sleep_for(context, std::chrono::microseconds(1000));
+  co_await sleep_for(context, std::chrono::microseconds(1000));
 
   error = i2c::read_data_inplace(device, &buffer[0], 6);
   if (error) {
     co_return error;
   }
-  *serial_0 = bytes_to_uint16_t(&buffer[0]);
-  *serial_1 = bytes_to_uint16_t(&buffer[2]);
-  *serial_2 = bytes_to_uint16_t(&buffer[4]);
-  co_return NO_ERROR;
+  *serial_0 = i2c::bytes_to_uint16_t(&buffer[0]);
+  *serial_1 = i2c::bytes_to_uint16_t(&buffer[2]);
+  *serial_2 = i2c::bytes_to_uint16_t(&buffer[4]);
+  co_return 0;
 }
 
-inline picoro::Coroutine<int16_t> SCD4x::perform_self_test(
+inline Coroutine<int16_t> SCD4x::perform_self_test(
     uint16_t* sensor_status) const {
   int16_t error;
   uint8_t buffer[3];
@@ -701,17 +545,17 @@ inline picoro::Coroutine<int16_t> SCD4x::perform_self_test(
     co_return error;
   }
 
-  co_await picoro::sleep_for(context, std::chrono::microseconds(10000000));
+  co_await sleep_for(context, std::chrono::microseconds(10000000));
 
   error = i2c::read_data_inplace(device, &buffer[0], 2);
   if (error) {
     co_return error;
   }
-  *sensor_status = bytes_to_uint16_t(&buffer[0]);
-  co_return NO_ERROR;
+  *sensor_status = i2c::bytes_to_uint16_t(&buffer[0]);
+  co_return 0;
 }
 
-inline picoro::Coroutine<int16_t> SCD4x::perform_factory_reset() const {
+inline Coroutine<int16_t> SCD4x::perform_factory_reset() const {
   int16_t error;
   uint8_t buffer[2];
   uint16_t offset = 0;
@@ -721,11 +565,11 @@ inline picoro::Coroutine<int16_t> SCD4x::perform_factory_reset() const {
   if (error) {
     co_return error;
   }
-  co_await picoro::sleep_for(context, std::chrono::microseconds(800000));
-  co_return NO_ERROR;
+  co_await sleep_for(context, std::chrono::microseconds(800000));
+  co_return 0;
 }
 
-inline picoro::Coroutine<int16_t> SCD4x::reinit() const {
+inline Coroutine<int16_t> SCD4x::reinit() const {
   int16_t error;
   uint8_t buffer[2];
   uint16_t offset = 0;
@@ -735,11 +579,11 @@ inline picoro::Coroutine<int16_t> SCD4x::reinit() const {
   if (error) {
     co_return error;
   }
-  co_await picoro::sleep_for(context, std::chrono::microseconds(20000));
-  co_return NO_ERROR;
+  co_await sleep_for(context, std::chrono::microseconds(20000));
+  co_return 0;
 }
 
-inline picoro::Coroutine<int16_t> SCD4x::measure_single_shot() const {
+inline Coroutine<int16_t> SCD4x::measure_single_shot() const {
   int16_t error;
   uint8_t buffer[2];
   uint16_t offset = 0;
@@ -749,11 +593,11 @@ inline picoro::Coroutine<int16_t> SCD4x::measure_single_shot() const {
   if (error) {
     co_return error;
   }
-  co_await picoro::sleep_for(context, std::chrono::microseconds(5000000));
-  co_return NO_ERROR;
+  co_await sleep_for(context, std::chrono::microseconds(5000000));
+  co_return 0;
 }
 
-inline picoro::Coroutine<int16_t> SCD4x::measure_single_shot_rht_only() const {
+inline Coroutine<int16_t> SCD4x::measure_single_shot_rht_only() const {
   int16_t error;
   uint8_t buffer[2];
   uint16_t offset = 0;
@@ -763,11 +607,11 @@ inline picoro::Coroutine<int16_t> SCD4x::measure_single_shot_rht_only() const {
   if (error) {
     co_return error;
   }
-  co_await picoro::sleep_for(context, std::chrono::microseconds(50000));
-  co_return NO_ERROR;
+  co_await sleep_for(context, std::chrono::microseconds(50000));
+  co_return 0;
 }
 
-inline picoro::Coroutine<int16_t> SCD4x::power_down() const {
+inline Coroutine<int16_t> SCD4x::power_down() const {
   int16_t error;
   uint8_t buffer[2];
   uint16_t offset = 0;
@@ -777,23 +621,20 @@ inline picoro::Coroutine<int16_t> SCD4x::power_down() const {
   if (error) {
     co_return error;
   }
-  co_await picoro::sleep_for(context, std::chrono::microseconds(1000));
-  co_return NO_ERROR;
+  co_await sleep_for(context, std::chrono::microseconds(1000));
+  co_return 0;
 }
 
-inline picoro::Coroutine<int16_t> SCD4x::wake_up() const {
+inline Coroutine<int16_t> SCD4x::wake_up() const {
   uint8_t buffer[2];
   uint16_t offset = 0;
   offset = i2c::add_command_to_buffer(&buffer[0], offset, 0x36F6);
 
   // Sensor does not acknowledge the wake-up call, error is ignored
   (void)i2c::write_data(device, &buffer[0], offset);
-  co_await picoro::sleep_for(context, std::chrono::microseconds(20000));
-  co_return NO_ERROR;
-}
-
-inline uint16_t SCD4x::bytes_to_uint16_t(const uint8_t* bytes) {
-  return (uint16_t)bytes[0] << 8 | (uint16_t)bytes[1];
+  co_await sleep_for(context, std::chrono::microseconds(20000));
+  co_return 0;
 }
 
 }  // namespace sensirion
+}  // namespace picoro
