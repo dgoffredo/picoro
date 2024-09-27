@@ -131,9 +131,13 @@ Picoro consists of the following, all of which live in `namespace picoro`:
     client.
 - [#include <picoro/debug.h>][19] defines `debug`, which is a wrapper around
   `printf` in debug builds, and a no-op in release builds.
-- [#include <picoro/drivers/scd4x.h>][20] is a driver for the Sensirion SCD40
-  and SCD41 CO₂ sensors.  It defines `struct sensirion::SCD4x`, whose member
-  functions can be `co_await`ed to interact with the sensor.
+- [#include <picoro/drivers/sensirion/scd4x.h>][20] is a driver for the
+  Sensirion SCD40 and SCD41 CO₂ sensors.  It defines `struct sensirion::SCD4x`,
+  whose member functions can be `co_await`ed to interact with the sensor.
+- [#include <picoro/drivers/sensirion/sht3x.h>][26] is a driver for the
+  Sensirion SHT33 temperature and humidity sensor.  It defines `struct
+  sensirion::SHT3x`, whose member function can be `co_await`ed to obtain a
+  measurement from the sensor.
 - [#include <picoro/drivers/dht22.h>][24] is a driver for the DHT22 (a.k.a.
   AM2302) temperature and humidity sensor.  It defines `class dht22::Driver`,
   from which `class dht22::Sensor` instances can be made.  `dht22::Sensor` has
@@ -155,7 +159,8 @@ Each include file has a corresponding library target:
 - `picoro_coroutine` when you `#include <picoro/coroutine.h>`
 - `picoro_debug` when you `#include <picoro/debug.h>`
 - `picoro_drivers_dht22` when you `#include <picoro/drivers/dht22.h>`
-- `picoro_drivers_scd4x` when you `#include <picoro/drivers/scd4x.h>`
+- `picoro_drivers_scd4x` when you `#include <picoro/drivers/sensirion/scd4x.h>`
+- `picoro_drivers_sht3x` when you `#include <picoro/drivers/sensirion/sht3x.h>`
 - `picoro_event_loop` when you `#include <picoro/event_loop.h>`
 - `picoro_sleep` when you `#include <picoro/sleep.h>`
 - `picoro_tcp` when you `#include <picoro/tcp.h>`
@@ -195,9 +200,10 @@ Each header file is documented in a comment block at the beginning of the file.
 [17]: include/picoro/event_loop.h
 [18]: include/picoro/tcp.h
 [19]: include/picoro/debug.h
-[20]: include/picoro/drivers/scd4x.h
+[20]: include/picoro/drivers/sensirion/scd4x.h
 [21]: examples/co2-server/
 [22]: examples/co2-server/CMakeLists.txt
 [23]: CMakeLists.txt
 [24]: include/picoro/drivers/dht22.h
 [25]: examples/fridge-monitor/
+[26]: include/picoro/drivers/sensirion/sht3x.h
