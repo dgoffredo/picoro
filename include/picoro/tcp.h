@@ -605,7 +605,6 @@ inline RecvAwaiter::RecvAwaiter(Connection::State *connection,
   // If nobody else is enqueued to consume received data from the connection,
   // then consume data if it's already available.  Then we won't even have to
   // suspend.
-  // TODO
   if (connection->receivers.empty()) {
     debug("in RecvAwaiter constructor: no other receivers\n");
     const auto to_consume =
