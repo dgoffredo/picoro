@@ -649,9 +649,9 @@ inline SendAwaiter::SendAwaiter(Connection::State *connection,
       length(data.size()),
       remaining(data.size()),
       error(ERR_OK) {
-  // TODO: `data` doesn't have to be null-terminated, but it is.
-  debug("in SendAwaiter constructor. connection: %p data.size(): %u data: %s\n",
-        connection, data.size(), data.data());
+  debug(
+      "in SendAwaiter constructor. connection: %p data.size(): %u data: %.*s\n",
+      connection, data.size(), int(data.size()), data.data());
   // If `connection` is null, we return (0, ERR_CLSD) without suspending.
   if (!connection) {
     error = ERR_CLSD;
