@@ -3,7 +3,7 @@
 #include <pico/stdlib.h>
 #include <picoro/coroutine.h>
 #include <picoro/debug.h>
-#include <picoro/drivers/scd4x.h>
+#include <picoro/drivers/sensirion/scd4x.h>
 #include <picoro/event_loop.h>
 #include <picoro/sleep.h>
 #include <picoro/tcp.h>
@@ -127,7 +127,7 @@ picoro::Coroutine<void> wait_for_usb_debug_attach(
   printf("Glad you could make it.\n");
 }
 
-picoro::Coroutine<bool> data_ready(const sensirion::SCD4x &sensor) {
+picoro::Coroutine<bool> data_ready(const picoro::sensirion::SCD4x &sensor) {
   bool result;
   int rc = co_await sensor.get_data_ready_flag(&result);
   if (rc) {
@@ -161,7 +161,7 @@ picoro::Coroutine<void> monitor_scd4x(async_context_t *context) {
   gpio_pull_up(sda_pin);
   gpio_pull_up(scl_pin);
 
-  sensirion::SCD4x sensor{context};
+  picoro::sensirion::SCD4x sensor{context};
   sensor.device.instance = instance;
 
   int rc = co_await sensor.set_automatic_self_calibration(0);

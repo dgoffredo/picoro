@@ -29,7 +29,7 @@ target_include_directories(co2-server PRIVATE
 target_link_libraries(co2-server
         picoro_coroutine
         picoro_debug
-        picoro_drivers_scd4x
+        picoro_drivers_sensirion_scd4x
         picoro_event_loop
         picoro_sleep
         picoro_tcp
