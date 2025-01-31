@@ -55,10 +55,9 @@
  */
 
 #include <hardware/i2c.h>
+#include <stdint.h>
 
 #include <chrono>
-
-#include <stdint.h>
 
 namespace picoro {
 namespace sensirion {

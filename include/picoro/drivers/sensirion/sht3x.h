@@ -128,42 +128,37 @@ struct SHT3x {
   explicit SHT3x(async_context_t*, uint8_t i2c_address = 0x44);
 
   Coroutine<int16_t> measure_single_shot_high_repeatability(
-        float* temperature_celsius,
-        float* humidity_percent);
+      float* temperature_celsius, float* humidity_percent);
 };
 
-inline
-SHT3x::SHT3x(async_context_t *context, uint8_t i2c_address) : context(context) {
+inline SHT3x::SHT3x(async_context_t* context, uint8_t i2c_address)
+    : context(context) {
   device.address = i2c_address;
 }
 
-inline
-Coroutine<int16_t> SHT3x::measure_single_shot_high_repeatability(
-      float* temperature_celsius,
-      float* humidity_percent) {
-    uint8_t buffer[6] = {};
-    const uint16_t offset =
-        i2c::add_command_to_buffer(buffer, 0, 0x2400);
-    int16_t error =
-        i2c::write_data(device, buffer, offset);
-    if (error) {
-        co_return error;
-    }
-
-    co_await sleep_for(context, std::chrono::milliseconds(16));
-
-    error = i2c::read_data_inplace(device, buffer, 4);
-    if (error) {
-        co_return error;
-    }
-
-    const uint16_t temperature_ticks = i2c::bytes_to_uint16_t(&buffer[0]);
-    const uint16_t humidity_ticks = i2c::bytes_to_uint16_t(&buffer[2]);
-    // Pass through `double` for precision, and then narrow to `float`.
-    *temperature_celsius = -45 + 175 * (temperature_ticks / 65535.0);
-    *humidity_percent = 100 * (humidity_ticks / 65535.0);
+inline Coroutine<int16_t> SHT3x::measure_single_shot_high_repeatability(
+    float* temperature_celsius, float* humidity_percent) {
+  uint8_t buffer[6] = {};
+  const uint16_t offset = i2c::add_command_to_buffer(buffer, 0, 0x2400);
+  int16_t error = i2c::write_data(device, buffer, offset);
+  if (error) {
     co_return error;
+  }
+
+  co_await sleep_for(context, std::chrono::milliseconds(16));
+
+  error = i2c::read_data_inplace(device, buffer, 4);
+  if (error) {
+    co_return error;
+  }
+
+  const uint16_t temperature_ticks = i2c::bytes_to_uint16_t(&buffer[0]);
+  const uint16_t humidity_ticks = i2c::bytes_to_uint16_t(&buffer[2]);
+  // Pass through `double` for precision, and then narrow to `float`.
+  *temperature_celsius = -45 + 175 * (temperature_ticks / 65535.0);
+  *humidity_percent = 100 * (humidity_ticks / 65535.0);
+  co_return error;
 }
 
-} // namespace sensirion
-} // namespace picoro
+}  // namespace sensirion
+}  // namespace picoro

@@ -171,38 +171,29 @@ struct SCD4x {
 
   Coroutine<int16_t> start_periodic_measurement() const;
   Coroutine<int16_t> read_measurement_ticks(uint16_t* co2,
-                                                    uint16_t* temperature,
-                                                    uint16_t* humidity) const;
-  Coroutine<int16_t> read_measurement(
-      uint16_t* co2, int32_t* temperature_m_deg_c,
-      int32_t* humidity_m_percent_rh) const;
+                                            uint16_t* temperature,
+                                            uint16_t* humidity) const;
+  Coroutine<int16_t> read_measurement(uint16_t* co2,
+                                      int32_t* temperature_m_deg_c,
+                                      int32_t* humidity_m_percent_rh) const;
   Coroutine<int16_t> stop_periodic_measurement() const;
-  Coroutine<int16_t> get_temperature_offset_ticks(
-      uint16_t* t_offset) const;
-  Coroutine<int16_t> get_temperature_offset(
-      int32_t* t_offset_m_deg_c) const;
-  Coroutine<int16_t> set_temperature_offset_ticks(
-      uint16_t t_offset) const;
-  Coroutine<int16_t> set_temperature_offset(
-      int32_t t_offset_m_deg_c) const;
-  Coroutine<int16_t> get_sensor_altitude(
-      uint16_t* sensor_altitude) const;
-  Coroutine<int16_t> set_sensor_altitude(
-      uint16_t sensor_altitude) const;
-  Coroutine<int16_t> set_ambient_pressure(
-      uint16_t ambient_pressure) const;
+  Coroutine<int16_t> get_temperature_offset_ticks(uint16_t* t_offset) const;
+  Coroutine<int16_t> get_temperature_offset(int32_t* t_offset_m_deg_c) const;
+  Coroutine<int16_t> set_temperature_offset_ticks(uint16_t t_offset) const;
+  Coroutine<int16_t> set_temperature_offset(int32_t t_offset_m_deg_c) const;
+  Coroutine<int16_t> get_sensor_altitude(uint16_t* sensor_altitude) const;
+  Coroutine<int16_t> set_sensor_altitude(uint16_t sensor_altitude) const;
+  Coroutine<int16_t> set_ambient_pressure(uint16_t ambient_pressure) const;
   Coroutine<int16_t> perform_forced_recalibration(
       uint16_t target_co2_concentration, uint16_t* frc_correction) const;
   Coroutine<int16_t> get_automatic_self_calibration(
       uint16_t* asc_enabled) const;
-  Coroutine<int16_t> set_automatic_self_calibration(
-      uint16_t asc_enabled) const;
+  Coroutine<int16_t> set_automatic_self_calibration(uint16_t asc_enabled) const;
   Coroutine<int16_t> start_low_power_periodic_measurement() const;
   Coroutine<int16_t> get_data_ready_flag(bool* data_ready_flag) const;
   Coroutine<int16_t> persist_settings() const;
-  Coroutine<int16_t> get_serial_number(uint16_t* serial_0,
-                                               uint16_t* serial_1,
-                                               uint16_t* serial_2) const;
+  Coroutine<int16_t> get_serial_number(uint16_t* serial_0, uint16_t* serial_1,
+                                       uint16_t* serial_2) const;
   Coroutine<int16_t> perform_self_test(uint16_t* sensor_status) const;
   Coroutine<int16_t> perform_factory_reset() const;
   Coroutine<int16_t> reinit() const;
@@ -212,7 +203,8 @@ struct SCD4x {
   Coroutine<int16_t> wake_up() const;
 };
 
-inline SCD4x::SCD4x(async_context_t* context, uint8_t i2c_address) : context(context) {
+inline SCD4x::SCD4x(async_context_t* context, uint8_t i2c_address)
+    : context(context) {
   device.address = i2c_address;
 }
 
@@ -462,8 +454,7 @@ inline Coroutine<int16_t> SCD4x::set_automatic_self_calibration(
   co_return 0;
 }
 
-inline Coroutine<int16_t> SCD4x::start_low_power_periodic_measurement()
-    const {
+inline Coroutine<int16_t> SCD4x::start_low_power_periodic_measurement() const {
   uint8_t buffer[2];
   uint16_t offset = 0;
   offset = i2c::add_command_to_buffer(&buffer[0], offset, 0x21AC);
@@ -509,8 +500,9 @@ inline Coroutine<int16_t> SCD4x::persist_settings() const {
   co_return 0;
 }
 
-inline Coroutine<int16_t> SCD4x::get_serial_number(
-    uint16_t* serial_0, uint16_t* serial_1, uint16_t* serial_2) const {
+inline Coroutine<int16_t> SCD4x::get_serial_number(uint16_t* serial_0,
+                                                   uint16_t* serial_1,
+                                                   uint16_t* serial_2) const {
   int16_t error;
   uint8_t buffer[9];
   uint16_t offset = 0;
