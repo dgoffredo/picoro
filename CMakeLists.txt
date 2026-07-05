@@ -3,6 +3,13 @@ project(picoro CXX C ASM)
 add_library(picoro_headers INTERFACE)
 target_include_directories(picoro_headers INTERFACE include)
 
+add_library(picoro_broadcaster INTERFACE)
+# Enable coroutines (GCC 10 requires a flag).
+target_compile_options(picoro_broadcaster INTERFACE $<$<COMPILE_LANGUAGE:CXX>:-fcoroutines>)
+target_link_libraries(picoro_broadcaster INTERFACE
+  picoro_headers
+)
+
 add_library(picoro_coroutine INTERFACE)
 # Enable coroutines (GCC 10 requires a flag).
 target_compile_options(picoro_coroutine INTERFACE $<$<COMPILE_LANGUAGE:CXX>:-fcoroutines>)
