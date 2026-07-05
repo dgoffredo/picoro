@@ -15,9 +15,9 @@
     (void)sizeof(WHAT); \
   } while (false)
 
-picoro::Coroutine<void> monitor_sensor(async_context_t *ctx,
-                                       picoro::dht22::Driver *driver, PIO pio,
-                                       uint8_t gpio_pin, const char *name) {
+picoro::Coroutine<void> monitor_sensor(async_context_t* ctx,
+                                       picoro::dht22::Driver* driver, PIO pio,
+                                       uint8_t gpio_pin, const char* name) {
   using Sensor = picoro::dht22::Sensor;
   Sensor sensor(driver, pio, gpio_pin);
   for (;;) {
@@ -45,7 +45,7 @@ int main() {
   async_context_poll_t context;
   const bool ok = async_context_poll_init_with_defaults(&context);
   ASSERT(ok);
-  async_context_t *const ctx = &context.core;
+  async_context_t* const ctx = &context.core;
 
   constexpr int which_dma_irq = 0;
   picoro::dht22::Driver driver(ctx, which_dma_irq);

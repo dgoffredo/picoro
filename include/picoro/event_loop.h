@@ -54,7 +54,7 @@ namespace picoro {
 //                     --- Steven J. Simmons
 
 template <typename... Coroutines>
-void run_event_loop(async_context_t *context,
+void run_event_loop(async_context_t* context,
                     Coroutines... toplevel_coroutines);
 
 // Implementations
@@ -63,7 +63,7 @@ void run_event_loop(async_context_t *context,
 // void run_event_loop
 // -------------------
 template <typename... Coroutines>
-void run_event_loop(async_context_t *context, Coroutines...) {
+void run_event_loop(async_context_t* context, Coroutines...) {
   // The `Coroutines...` don't need names.  `picoro::Coroutine` is eagerly
   // started, so the `Coroutines...` parameters serve only to provide a place
   // for those coroutine objects to live while the event loop runs.

@@ -22,7 +22,7 @@ inline int debug(const char*, ...) { return 0; }
 // The use of a template will cause overloads to proliferate, but it's cleaner
 // than using <cstdarg> and will probably get inlined away.
 template <typename... Parameters>
-int debug(const char *format, Parameters... parameters) {
+int debug(const char* format, Parameters... parameters) {
   const int rc = printf(format, parameters...);
   fflush(stdout);
   return rc;

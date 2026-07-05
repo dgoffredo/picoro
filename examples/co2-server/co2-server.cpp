@@ -21,7 +21,7 @@
 
 #include "secrets.h"
 
-const char *cyw43_describe(int status) {
+const char* cyw43_describe(int status) {
   switch (status) {
     case CYW43_LINK_DOWN:
       return "[CYW43_LINK_DOWN] Wifi down";
@@ -42,7 +42,7 @@ const char *cyw43_describe(int status) {
   return "Unknown cyw43 status code";
 }
 
-const char *pico_describe(int error) {
+const char* pico_describe(int error) {
   switch (error) {
     case PICO_OK:
       return "[PICO_OK]";
@@ -79,8 +79,8 @@ constexpr std::size_t max_response_length = 255;
 
 int format_response(
     // +1 for the null terminator
-    std::array<char, max_response_length + 1> &buffer,
-    const Measurement &data) {
+    std::array<char, max_response_length + 1>& buffer,
+    const Measurement& data) {
   // If we haven't made a measurement yet, respond with an error telling the
   // client to try again in a few seconds.
   if (data.sequence_number == 0) {
@@ -114,7 +114,7 @@ int format_response(
 // Blink the onboard LED while we're waiting.
 // Give up after the specified number of seconds.
 picoro::Coroutine<void> wait_for_usb_debug_attach(
-    async_context_t *context, std::chrono::seconds timeout) {
+    async_context_t* context, std::chrono::seconds timeout) {
   const int iterations = timeout / std::chrono::seconds(1);
   for (int i = 0; i < iterations && !tud_cdc_connected(); ++i) {
     cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
@@ -127,7 +127,7 @@ picoro::Coroutine<void> wait_for_usb_debug_attach(
   printf("Glad you could make it.\n");
 }
 
-picoro::Coroutine<bool> data_ready(const picoro::sensirion::SCD4x &sensor) {
+picoro::Coroutine<bool> data_ready(const picoro::sensirion::SCD4x& sensor) {
   bool result;
   int rc = co_await sensor.get_data_ready_flag(&result);
   if (rc) {
@@ -146,14 +146,14 @@ int print_millis_as_decimal(int32_t millis) {
   return printf("%ld.%03ld", millis / 1000, std::abs(millis) % 1000);
 }
 
-picoro::Coroutine<void> monitor_scd4x(async_context_t *context) {
+picoro::Coroutine<void> monitor_scd4x(async_context_t* context) {
   // I²C GPIO pins
   const uint sda_pin = 12;
   const uint scl_pin = 13;
   // I²C clock rate
   const uint clock_hz = 400 * 1000;
 
-  i2c_inst_t *const instance = i2c0;
+  i2c_inst_t* const instance = i2c0;
   const uint actual_baudrate = i2c_init(instance, clock_hz);
   printf("The actual I2C baudrate is %u Hz\n", actual_baudrate);
   gpio_set_function(sda_pin, GPIO_FUNC_I2C);
@@ -207,7 +207,7 @@ picoro::Coroutine<void> monitor_scd4x(async_context_t *context) {
   i2c_deinit(instance);
 }
 
-picoro::Coroutine<void> blink(async_context_t *context, int times,
+picoro::Coroutine<void> blink(async_context_t* context, int times,
                               std::chrono::milliseconds period) {
   const bool led_state = cyw43_arch_gpio_get(CYW43_WL_GPIO_LED_PIN);
   const auto delay = period / 2;
@@ -219,8 +219,8 @@ picoro::Coroutine<void> blink(async_context_t *context, int times,
   }
 }
 
-picoro::Coroutine<void> wifi_connect(async_context_t *context, const char *SSID,
-                                     const char *password) {
+picoro::Coroutine<void> wifi_connect(async_context_t* context, const char* SSID,
+                                     const char* password) {
   struct LEDGuard {
     LEDGuard() { cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, true); }
     ~LEDGuard() { cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, false); }
@@ -329,14 +329,14 @@ picoro::Coroutine<void> http_server(int port, int listen_backlog) {
   }
 }
 
-picoro::Coroutine<void> networking(async_context_t *context) {
+picoro::Coroutine<void> networking(async_context_t* context) {
   co_await wifi_connect(context, secrets::wifi_ssid, secrets::wifi_password);
   const int port = 80;
   const int listen_backlog = 1;
   co_await http_server(port, listen_backlog);
 }
 
-picoro::Coroutine<void> coroutine_main(async_context_t *context) {
+picoro::Coroutine<void> coroutine_main(async_context_t* context) {
   co_await wait_for_usb_debug_attach(context, std::chrono::seconds(10));
   // Run the WiFi and server setup in the background.
   networking(context).detach();

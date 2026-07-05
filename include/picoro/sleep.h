@@ -67,7 +67,7 @@ namespace picoro {
 //                     --- Steven J. Simmons
 
 struct Sleep {
-  async_context_t *context;
+  async_context_t* context;
   absolute_time_t deadline;
   async_at_time_worker_t worker = {};
   std::coroutine_handle<> continuation = nullptr;
@@ -76,12 +76,12 @@ struct Sleep {
   void await_suspend(std::coroutine_handle<> continuation);
   void await_resume();
 
-  static void on_expire(async_context_t *, async_at_time_worker_t *);
+  static void on_expire(async_context_t*, async_at_time_worker_t*);
 };
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-Sleep sleep_for(async_context_t *context, std::chrono::microseconds delay);
+Sleep sleep_for(async_context_t* context, std::chrono::microseconds delay);
 
 // Implementations
 // ===============
@@ -99,13 +99,12 @@ inline void Sleep::await_suspend(std::coroutine_handle<> coroutine) {
 
 inline void Sleep::await_resume() {}
 
-inline void Sleep::on_expire(async_context_t *,
-                             async_at_time_worker_t *worker) {
-  auto *sleep = static_cast<Sleep *>(worker->user_data);
+inline void Sleep::on_expire(async_context_t*, async_at_time_worker_t* worker) {
+  auto* sleep = static_cast<Sleep*>(worker->user_data);
   sleep->continuation.resume();
 }
 
-inline Sleep sleep_for(async_context_t *context,
+inline Sleep sleep_for(async_context_t* context,
                        std::chrono::microseconds delay) {
   const uint64_t delay_us = delay / std::chrono::microseconds(1);
   return Sleep{context, make_timeout_time_us(delay_us)};

@@ -125,7 +125,7 @@ template <typename Ret>
 class Coroutine {
  public:
   struct Deleter {
-    void operator()(Promise<Ret> *);
+    void operator()(Promise<Ret>*);
   };
 
   using promise_type = Promise<Ret>;
@@ -137,10 +137,10 @@ class Coroutine {
  public:
   explicit Coroutine(UniqueHandle promise);
 
-  Coroutine(Coroutine &&) = default;
+  Coroutine(Coroutine&&) = default;
 
   Coroutine() = delete;
-  Coroutine(const Coroutine &) = delete;
+  Coroutine(const Coroutine&) = delete;
 
   Awaiter<Ret> operator co_await();
 
@@ -168,8 +168,8 @@ class Promise {
 
  public:
   Promise();
-  Promise(const Promise &) = delete;
-  Promise(Promise &&) = delete;
+  Promise(const Promise&) = delete;
+  Promise(Promise&&) = delete;
   ~Promise();
 
   void detach();
@@ -180,7 +180,7 @@ class Promise {
   // `return_value` is a template so that the argument to `co_return` need not
   // be exactly a `Ret`, but anything convertible to `Ret`.
   template <typename Value>
-  void return_value(Value &&);
+  void return_value(Value&&);
 
   void unhandled_exception();
 };
@@ -203,8 +203,8 @@ class Promise<void> {
 
  public:
   Promise();
-  Promise(const Promise &) = delete;
-  Promise(Promise &&) = delete;
+  Promise(const Promise&) = delete;
+  Promise(Promise&&) = delete;
 
   void detach();
 
@@ -220,10 +220,10 @@ class Promise<void> {
 
 template <typename Ret>
 class Awaiter {
-  Promise<Ret> *promise_;
+  Promise<Ret>* promise_;
 
  public:
-  explicit Awaiter(Promise<Ret> *promise);
+  explicit Awaiter(Promise<Ret>* promise);
 
   bool await_ready();
   bool await_suspend(std::coroutine_handle<> continuation);
@@ -234,10 +234,10 @@ class Awaiter {
 
 template <>
 class Awaiter<void> {
-  Promise<void> *promise_;
+  Promise<void>* promise_;
 
  public:
-  explicit Awaiter(Promise<void> *promise);
+  explicit Awaiter(Promise<void>* promise);
 
   bool await_ready();
   bool await_suspend(std::coroutine_handle<> continuation);
@@ -250,7 +250,7 @@ class Awaiter<void> {
 // class Coroutine<Ret>
 // --------------------
 template <typename Ret>
-void Coroutine<Ret>::Deleter::operator()(Promise<Ret> *promise) {
+void Coroutine<Ret>::Deleter::operator()(Promise<Ret>* promise) {
   debug("Destroying a Promise at address %p\n", promise);
   std::coroutine_handle<Promise<Ret>>::from_promise(*promise).destroy();
 }
@@ -291,7 +291,7 @@ Promise<Ret>::Promise() : continuation_(std::noop_coroutine()) {}
 
 template <typename Ret>
 Promise<Ret>::~Promise() {
-  Ret *value = std::launder(reinterpret_cast<Ret *>(&value_[0]));
+  Ret* value = std::launder(reinterpret_cast<Ret*>(&value_[0]));
   value->~Ret();
 }
 
@@ -317,7 +317,7 @@ FinalAwaitable Promise<Ret>::final_suspend() noexcept {
 
 template <typename Ret>
 template <typename Value>
-void Promise<Ret>::return_value(Value &&value) {
+void Promise<Ret>::return_value(Value&& value) {
   new (&value_[0]) Ret(std::forward<Value>(value));
 }
 
@@ -351,7 +351,7 @@ inline void Promise<void>::unhandled_exception() { std::terminate(); }
 // class Awaiter<Ret>
 // ------------------
 template <typename Ret>
-Awaiter<Ret>::Awaiter(Promise<Ret> *promise) : promise_(promise) {}
+Awaiter<Ret>::Awaiter(Promise<Ret>* promise) : promise_(promise) {}
 
 template <typename Ret>
 bool Awaiter<Ret>::await_ready() {
@@ -367,13 +367,13 @@ bool Awaiter<Ret>::await_suspend(std::coroutine_handle<> continuation) {
 
 template <typename Ret>
 Ret Awaiter<Ret>::await_resume() {
-  Ret *value = std::launder(reinterpret_cast<Ret *>(&promise_->value_[0]));
+  Ret* value = std::launder(reinterpret_cast<Ret*>(&promise_->value_[0]));
   return std::move(*value);
 }
 
 // class Awaiter<void>
 // -------------------
-inline Awaiter<void>::Awaiter(Promise<void> *promise) : promise_(promise) {}
+inline Awaiter<void>::Awaiter(Promise<void>* promise) : promise_(promise) {}
 
 inline bool Awaiter<void>::await_ready() {
   auto handle = std::coroutine_handle<Promise<void>>::from_promise(*promise_);

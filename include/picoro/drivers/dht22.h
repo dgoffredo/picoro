@@ -164,9 +164,9 @@ class Driver;
 class Sensor;
 
 class Driver {
-  async_context_t *context;
+  async_context_t* context;
   async_when_pending_worker_t worker;
-  std::array<Sensor *, 8> sensors;
+  std::array<Sensor*, 8> sensors;
   std::array<int, 2> program_offsets;  // [in PIO0, in PIO1]. -1 means N/A.
   uint8_t which_dma_irq : 1;
   bool irq_previously_enabled : 1;
@@ -174,12 +174,12 @@ class Driver {
   friend class Sensor;
 
  public:
-  explicit Driver(async_context_t *, uint8_t which_dma_irq);
+  explicit Driver(async_context_t*, uint8_t which_dma_irq);
   ~Driver();
   // You can't copy or move a Driver, because its `.worker` member is
   // referenced by an event loop (`.context`).
-  Driver(const Driver &) = delete;
-  Driver(Driver &&) = delete;
+  Driver(const Driver&) = delete;
+  Driver(Driver&&) = delete;
 
  private:
   int load(PIO);
@@ -187,8 +187,8 @@ class Driver {
   template <uint8_t which_dma_irq>
   static void dma_irq_handler();
 
-  static void handle_ready_sensors(async_context_t *,
-                                   async_when_pending_worker_t *);
+  static void handle_ready_sensors(async_context_t*,
+                                   async_when_pending_worker_t*);
 };
 
 class Sensor {
@@ -199,22 +199,22 @@ class Sensor {
   bool ready : 1;
   uint8_t gpio_pin : 5;  // only needed for reset()
   std::coroutine_handle<> continuation;
-  Driver *driver;
+  Driver* driver;
 
   friend class Driver;
 
  public:
-  explicit Sensor(Driver *, PIO, int gpio_pin);
+  explicit Sensor(Driver*, PIO, int gpio_pin);
   ~Sensor();
   // You can't copy or move a Sensor, because its `.data` member is
   // referenced by a DMA channel.
-  Sensor(const Sensor &) = delete;
-  Sensor(Sensor &&) = delete;
+  Sensor(const Sensor&) = delete;
+  Sensor(Sensor&&) = delete;
 
   enum Result { OK, FAILED_CHECKSUM, TIMEOUT };
-  static const char *describe(Result);
+  static const char* describe(Result);
 
-  Coroutine<Result> measure(float *celsius, float *humidity_percent);
+  Coroutine<Result> measure(float* celsius, float* humidity_percent);
 
   void reset();
 
@@ -236,19 +236,19 @@ class Sensor {
 // When a `Driver` is destroyed, it uninstalls itself via
 // `driver_at_core[get_core_num()] = nullptr;`.
 // Each CPU core can have at most one `Driver` at a time.
-inline Driver *driver_at_core[2] = {};
+inline Driver* driver_at_core[2] = {};
 
 // class Driver
 // ------------
 template <uint8_t which_dma_irq>
 void Driver::dma_irq_handler() {
-  Driver *driver = driver_at_core[get_core_num()];
+  Driver* driver = driver_at_core[get_core_num()];
   if (driver == nullptr) {
     // TODO: spurious?
     return;
   }
 
-  for (Sensor *sensor : driver->sensors) {
+  for (Sensor* sensor : driver->sensors) {
     if (sensor == nullptr) {
       // This sensor isn't in use.
       continue;
@@ -269,10 +269,10 @@ void Driver::dma_irq_handler() {
   }
 }
 
-inline void Driver::handle_ready_sensors(async_context_t *,
-                                         async_when_pending_worker_t *worker) {
-  auto *driver = static_cast<Driver *>(worker->user_data);
-  for (Sensor *sensor : driver->sensors) {
+inline void Driver::handle_ready_sensors(async_context_t*,
+                                         async_when_pending_worker_t* worker) {
+  auto* driver = static_cast<Driver*>(worker->user_data);
+  for (Sensor* sensor : driver->sensors) {
     if (sensor == nullptr || !sensor->ready) {
       continue;
     }
@@ -292,7 +292,7 @@ inline void Driver::handle_ready_sensors(async_context_t *,
   }
 }
 
-inline Driver::Driver(async_context_t *context, uint8_t which_dma_irq)
+inline Driver::Driver(async_context_t* context, uint8_t which_dma_irq)
     : context(context),
       worker(),
       sensors(),
@@ -370,7 +370,7 @@ inline int Driver::load(PIO pio) {
 
 // class Sensor
 // ------------
-inline Sensor::Sensor(Driver *driver, PIO pio, int gpio_pin)
+inline Sensor::Sensor(Driver* driver, PIO pio, int gpio_pin)
     : data(), ready(false), gpio_pin(gpio_pin), driver(driver) {
   debug("dht22::Sensor::Sensor\n");
   const auto slot =
@@ -456,13 +456,13 @@ inline PIO Sensor::get_pio() const { return which_pio ? pio1 : pio0; }
 
 inline void Sensor::set_pio(PIO pio) { which_pio = (pio == pio1); }
 
-inline const char *Sensor::describe(Result result) {
-  const char *const descriptions[] = {"ok", "failed checksum", "timeout"};
+inline const char* Sensor::describe(Result result) {
+  const char* const descriptions[] = {"ok", "failed checksum", "timeout"};
   return descriptions[result];
 }
 
-inline Coroutine<Sensor::Result> Sensor::measure(float *celsius,
-                                                 float *humidity_percent) {
+inline Coroutine<Sensor::Result> Sensor::measure(float* celsius,
+                                                 float* humidity_percent) {
   // Push some counters to the state machine. It will put them in its x and y
   // registers. We pack them together as two 16-bit values in one 32-bit
   // word.
@@ -474,7 +474,7 @@ inline Coroutine<Sensor::Result> Sensor::measure(float *celsius,
   pio_sm_put(get_pio(), state_machine, payload);
 
   struct Awaiter {
-    Sensor *sensor;
+    Sensor* sensor;
     async_at_time_worker_t timeout = {};
     bool timed_out = false;
 
@@ -520,8 +520,8 @@ inline Coroutine<Sensor::Result> Sensor::measure(float *celsius,
       return Sensor::Result::OK;
     }
 
-    static void on_timeout(async_context_t *, async_at_time_worker_t *worker) {
-      auto *awaiter = static_cast<Awaiter *>(worker->user_data);
+    static void on_timeout(async_context_t*, async_at_time_worker_t* worker) {
+      auto* awaiter = static_cast<Awaiter*>(worker->user_data);
       if (auto continuation = awaiter->sensor->continuation) {
         awaiter->timed_out = true;
         awaiter->sensor->continuation = nullptr;
@@ -554,7 +554,7 @@ inline Coroutine<Sensor::Result> Sensor::measure(float *celsius,
 inline void Sensor::reset() {
   // Save local copies of the data members needed for the constructor:
   // Sensor::Sensor(Driver *driver, PIO pio, int gpio_pin)
-  Driver *driver = this->driver;
+  Driver* driver = this->driver;
   PIO pio = get_pio();
   int gpio_pin = this->gpio_pin;
 
