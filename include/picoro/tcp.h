@@ -434,10 +434,11 @@ inline Connection::Connection(tcp_pcb *client_pcb) {
 
 inline Connection::~Connection() { (void)close(); }
 
-inline err_t Connection::on_recv(void *user_data, tcp_pcb *, pbuf *buffer,
+inline err_t Connection::on_recv(void *user_data, tcp_pcb *client_pcb, pbuf *buffer,
                                  err_t error) {
   debug("in Connection::on_recv\n");
   auto *state = static_cast<Connection::State *>(user_data);
+  assert(client_pcb == state->client_pcb);
 
   struct Guard {
     pbuf *buffer;
@@ -460,6 +461,14 @@ inline err_t Connection::on_recv(void *user_data, tcp_pcb *, pbuf *buffer,
       state->receivers.pop();
       receiver->error = error;
       receiver->continuation.resume();
+    }
+    if (TCP_STATE_IS_CLOSING(client_pcb->state)) {
+      while (!state->senders.empty()) {
+        SendAwaiter *sender = state->senders.front();
+        state->senders.pop();
+        sender->error = ERR_CLSD;  // TODO: technically not "connection closed"
+        sender->continuation.resume();
+      }
     }
     return ERR_OK;
   }
@@ -491,7 +500,7 @@ inline err_t Connection::on_recv(void *user_data, tcp_pcb *, pbuf *buffer,
     // data the receiver requested.
     state->receivers.pop();
     receiver->continuation.resume();
-    tcp_recved(state->client_pcb, to_copy);
+    tcp_recved(client_pcb, to_copy);
   }
   received.erase(0, i);
 
@@ -566,6 +575,7 @@ inline err_t Connection::close() {
   tcp_recv(state_->client_pcb, nullptr);
   tcp_err(state_->client_pcb, nullptr);
   const err_t error = tcp_close(state_->client_pcb);
+  debug("Connection::close() tcp_close returned %s", lwip_describe(error));
   state_->client_pcb = nullptr;
 
   // Wake up senders and receivers. Deliver a ERR_CLSD (connection closed)
@@ -652,22 +662,22 @@ inline SendAwaiter::SendAwaiter(Connection::State *connection,
   debug(
       "in SendAwaiter constructor. connection: %p data.size(): %u data: %.*s\n",
       connection, data.size(), int(data.size()), data.data());
-  // If `connection` is null, we return (0, ERR_CLSD) without suspending.
-  if (!connection) {
+  // If `connection` is null or disconnecting, we return (0, ERR_CLSD) without suspending.
+  if (!connection || TCP_STATE_IS_CLOSING(connection->client_pcb->state)) {
     error = ERR_CLSD;
     return;
   }
 
   const u8_t flags = TCP_WRITE_FLAG_COPY;
   error = tcp_write(connection->client_pcb, data.data(), data.size(), flags);
-  debug("in SendAwaiter constructor. tcp_write returned %s\n",
-        lwip_describe(error));
+  debug("in SendAwaiter constructor. tcp_write returned %s and the PCB state is %s\n",
+        lwip_describe(error), tcp_debug_state_str(connection->client_pcb->state));
   // `tcp_write` enqueues data for sending "later." `tcp_output` actually tries
   // to send the data.
   if (error == ERR_OK) {
     error = tcp_output(connection->client_pcb);
-    debug("in SendAwaiter constructor. tcp_output returned %s\n",
-          lwip_describe(error));
+    debug("in SendAwaiter constructor. tcp_output returned %s and the PCB state is %s\n",
+          lwip_describe(error), tcp_debug_state_str(connection->client_pcb->state));
   }
 }
 
