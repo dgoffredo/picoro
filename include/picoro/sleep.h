@@ -104,8 +104,7 @@ inline void Sleep::on_expire(async_context_t*, async_at_time_worker_t* worker) {
   sleep->continuation.resume();
 }
 
-inline Sleep sleep_for(async_context_t* context,
-                       std::chrono::microseconds delay) {
+inline Sleep sleep_for(async_context_t* context, std::chrono::microseconds delay) {
   const uint64_t delay_us = delay / std::chrono::microseconds(1);
   return Sleep{context, make_timeout_time_us(delay_us)};
 }

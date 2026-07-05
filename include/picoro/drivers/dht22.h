@@ -187,8 +187,7 @@ class Driver {
   template <uint8_t which_dma_irq>
   static void dma_irq_handler();
 
-  static void handle_ready_sensors(async_context_t*,
-                                   async_when_pending_worker_t*);
+  static void handle_ready_sensors(async_context_t*, async_when_pending_worker_t*);
 };
 
 class Sensor {
@@ -269,8 +268,7 @@ void Driver::dma_irq_handler() {
   }
 }
 
-inline void Driver::handle_ready_sensors(async_context_t*,
-                                         async_when_pending_worker_t* worker) {
+inline void Driver::handle_ready_sensors(async_context_t*, async_when_pending_worker_t* worker) {
   auto* driver = static_cast<Driver*>(worker->user_data);
   for (Sensor* sensor : driver->sensors) {
     if (sensor == nullptr || !sensor->ready) {
@@ -317,10 +315,8 @@ inline Driver::Driver(async_context_t* context, uint8_t which_dma_irq)
   async_context_add_when_pending_worker(context, &worker);
 
   const auto irq = which_dma_irq ? DMA_IRQ_1 : DMA_IRQ_0;
-  const auto handler =
-      which_dma_irq ? &Driver::dma_irq_handler<1> : &Driver::dma_irq_handler<0>;
-  irq_add_shared_handler(irq, handler,
-                         PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY);
+  const auto handler = which_dma_irq ? &Driver::dma_irq_handler<1> : &Driver::dma_irq_handler<0>;
+  irq_add_shared_handler(irq, handler, PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY);
   irq_previously_enabled = irq_is_enabled(irq);
   irq_set_enabled(irq, true);
 }
@@ -336,16 +332,14 @@ Driver::~Driver() {
 
   const uint core = get_core_num();
   if (driver_at_core[core] != this) {
-    panic(
-        "In dht22::Driver destructor: At most one Driver per core is allowed.");
+    panic("In dht22::Driver destructor: At most one Driver per core is allowed.");
   }
   driver_at_core[core] = nullptr;
 
   async_context_remove_when_pending_worker(context, &worker);
 
   const auto irq = which_dma_irq ? DMA_IRQ_1 : DMA_IRQ_0;
-  const auto handler =
-      which_dma_irq ? &Driver::dma_irq_handler<1> : &Driver::dma_irq_handler<0>;
+  const auto handler = which_dma_irq ? &Driver::dma_irq_handler<1> : &Driver::dma_irq_handler<0>;
   irq_remove_handler(irq, handler);
   if (!irq_previously_enabled) {
     // TODO: but maybe somebody else has enabled it since...
@@ -373,8 +367,7 @@ inline int Driver::load(PIO pio) {
 inline Sensor::Sensor(Driver* driver, PIO pio, int gpio_pin)
     : data(), ready(false), gpio_pin(gpio_pin), driver(driver) {
   debug("dht22::Sensor::Sensor\n");
-  const auto slot =
-      std::find(driver->sensors.begin(), driver->sensors.end(), nullptr);
+  const auto slot = std::find(driver->sensors.begin(), driver->sensors.end(), nullptr);
   if (slot == driver->sensors.end()) {
     panic(
         "In dht22::Sensor constructor: dht22::Driver is already full of "
@@ -398,8 +391,8 @@ inline Sensor::Sensor(Driver* driver, PIO pio, int gpio_pin)
   channel_config_set_write_increment(&dma_cfg, true);
   const uint chunk_count = 5;
   const bool trigger = true;
-  dma_channel_configure(dma_channel, &dma_cfg, data.data(),
-                        &pio->rxf[state_machine], chunk_count, trigger);
+  dma_channel_configure(dma_channel, &dma_cfg, data.data(), &pio->rxf[state_machine], chunk_count,
+                        trigger);
   dma_irqn_set_channel_enabled(driver->which_dma_irq, dma_channel, true);
 
   pio_gpio_init(pio, gpio_pin);
@@ -426,8 +419,7 @@ inline Sensor::Sensor(Driver* driver, PIO pio, int gpio_pin)
   const bool shift_direction = false;  // false means left
   const bool autopush = true;
   const uint autopush_threshold_bits = 8;
-  sm_config_set_in_shift(&pio_cfg, shift_direction, autopush,
-                         autopush_threshold_bits);
+  sm_config_set_in_shift(&pio_cfg, shift_direction, autopush, autopush_threshold_bits);
   pio_sm_init(pio, state_machine, program_offset, &pio_cfg);
 
   // 🐎 🐎 🐎 🐎
@@ -436,8 +428,7 @@ inline Sensor::Sensor(Driver* driver, PIO pio, int gpio_pin)
 
 inline Sensor::~Sensor() {
   debug("dht22::Sensor::~Sensor\n");
-  const auto slot =
-      std::find(driver->sensors.begin(), driver->sensors.end(), this);
+  const auto slot = std::find(driver->sensors.begin(), driver->sensors.end(), this);
   if (slot == driver->sensors.end()) {
     panic("In dht22::Sensor destructor: dht22::Driver is missing me.");
   }
@@ -461,8 +452,7 @@ inline const char* Sensor::describe(Result result) {
   return descriptions[result];
 }
 
-inline Coroutine<Sensor::Result> Sensor::measure(float* celsius,
-                                                 float* humidity_percent) {
+inline Coroutine<Sensor::Result> Sensor::measure(float* celsius, float* humidity_percent) {
   // Push some counters to the state machine. It will put them in its x and y
   // registers. We pack them together as two 16-bit values in one 32-bit
   // word.
@@ -506,8 +496,8 @@ inline Coroutine<Sensor::Result> Sensor::measure(float* celsius,
       // longest that a measurement can take in microseconds is:
       //
       //     1000 + 200 + 85 + 85 + (55 + 75)*40 + 55  =  6625
-      (void)async_context_add_at_time_worker_at(
-          sensor->driver->context, &timeout, make_timeout_time_us(7000));
+      (void)async_context_add_at_time_worker_at(sensor->driver->context, &timeout,
+                                                make_timeout_time_us(7000));
       return true;
     }
 
@@ -515,8 +505,7 @@ inline Coroutine<Sensor::Result> Sensor::measure(float* celsius,
       if (timed_out) {
         return Sensor::Result::TIMEOUT;
       }
-      (void)async_context_remove_at_time_worker(sensor->driver->context,
-                                                &timeout);
+      (void)async_context_remove_at_time_worker(sensor->driver->context, &timeout);
       return Sensor::Result::OK;
     }
 
@@ -570,9 +559,7 @@ inline float Sensor::decode_temperature(uint8_t b0, uint8_t b1) {
   return temperature;
 }
 
-inline float Sensor::decode_humidity(uint8_t b0, uint8_t b1) {
-  return 0.1f * ((b0 << 8) + b1);
-}
+inline float Sensor::decode_humidity(uint8_t b0, uint8_t b1) { return 0.1f * ((b0 << 8) + b1); }
 
 }  // namespace dht22
 }  // namespace picoro

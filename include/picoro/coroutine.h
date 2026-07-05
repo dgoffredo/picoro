@@ -256,8 +256,7 @@ void Coroutine<Ret>::Deleter::operator()(Promise<Ret>* promise) {
 }
 
 template <typename Ret>
-inline Coroutine<Ret>::Coroutine(UniqueHandle promise)
-    : promise_(std::move(promise)) {}
+inline Coroutine<Ret>::Coroutine(UniqueHandle promise) : promise_(std::move(promise)) {}
 
 template <typename Ret>
 inline Awaiter<Ret> Coroutine<Ret>::operator co_await() {
@@ -271,14 +270,12 @@ inline void Coroutine<Ret>::detach() {
 
 // class FinalAwaitable
 // -------------------------------
-inline FinalAwaitable::FinalAwaitable(std::coroutine_handle<> coroutine,
-                                      bool detached)
+inline FinalAwaitable::FinalAwaitable(std::coroutine_handle<> coroutine, bool detached)
     : coroutine_(coroutine), detached_(detached) {}
 
 inline bool FinalAwaitable::await_ready() noexcept { return detached_; }
 
-inline std::coroutine_handle<> FinalAwaitable::await_suspend(
-    std::coroutine_handle<>) noexcept {
+inline std::coroutine_handle<> FinalAwaitable::await_suspend(std::coroutine_handle<>) noexcept {
   return coroutine_;
 }
 
@@ -336,9 +333,7 @@ inline Coroutine<void> Promise<void>::get_return_object() {
   return Coroutine<void>(Coroutine<void>::UniqueHandle(this));
 }
 
-inline std::suspend_never Promise<void>::initial_suspend() {
-  return std::suspend_never();
-}
+inline std::suspend_never Promise<void>::initial_suspend() { return std::suspend_never(); }
 
 inline FinalAwaitable Promise<void>::final_suspend() noexcept {
   return FinalAwaitable(continuation_, detached_);

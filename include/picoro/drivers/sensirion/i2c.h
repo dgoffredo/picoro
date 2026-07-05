@@ -101,8 +101,7 @@ struct Device {
 inline int8_t Device::read(uint8_t* data, uint16_t count) const {
   const bool nostop = true;  // master retains control of the bus after the read
   const unsigned timeout_μs = read_timeout / std::chrono::microseconds(1);
-  const int rc =
-      i2c_read_timeout_us(instance, address, data, count, nostop, timeout_μs);
+  const int rc = i2c_read_timeout_us(instance, address, data, count, nostop, timeout_μs);
   switch (rc) {
     case PICO_ERROR_GENERIC:  // address not acknowledged
     case PICO_ERROR_TIMEOUT:  // device didn't respond in time
@@ -118,11 +117,9 @@ inline int8_t Device::read(uint8_t* data, uint16_t count) const {
 }
 
 inline int8_t Device::write(const uint8_t* data, uint16_t count) const {
-  const bool nostop =
-      true;  // master retains control of the bus after the write
+  const bool nostop = true;  // master retains control of the bus after the write
   const unsigned timeout_μs = write_timeout / std::chrono::microseconds(1);
-  const int rc =
-      i2c_write_timeout_us(instance, address, data, count, nostop, timeout_μs);
+  const int rc = i2c_write_timeout_us(instance, address, data, count, nostop, timeout_μs);
   switch (rc) {
     case PICO_ERROR_GENERIC:  // address not acknowledged
     case PICO_ERROR_TIMEOUT:  // device didn't respond in time
@@ -163,15 +160,13 @@ inline int8_t check_crc(const uint8_t* data, uint16_t count, uint8_t checksum) {
   return 0;
 }
 
-inline uint16_t add_command_to_buffer(uint8_t* buffer, uint16_t offset,
-                                      uint16_t command) {
+inline uint16_t add_command_to_buffer(uint8_t* buffer, uint16_t offset, uint16_t command) {
   buffer[offset++] = (uint8_t)((command & 0xFF00) >> 8);
   buffer[offset++] = (uint8_t)((command & 0x00FF) >> 0);
   return offset;
 }
 
-inline uint16_t add_uint16_t_to_buffer(uint8_t* buffer, uint16_t offset,
-                                       uint16_t data) {
+inline uint16_t add_uint16_t_to_buffer(uint8_t* buffer, uint16_t offset, uint16_t data) {
   buffer[offset++] = (uint8_t)((data & 0xFF00) >> 8);
   buffer[offset++] = (uint8_t)((data & 0x00FF) >> 0);
   buffer[offset] = generate_crc(&buffer[offset - WORD_SIZE], WORD_SIZE);
@@ -180,8 +175,7 @@ inline uint16_t add_uint16_t_to_buffer(uint8_t* buffer, uint16_t offset,
   return offset;
 }
 
-inline int16_t write_data(const Device& device, const uint8_t* data,
-                          uint16_t data_length) {
+inline int16_t write_data(const Device& device, const uint8_t* data, uint16_t data_length) {
   return device.write(data, data_length);
 }
 

@@ -54,8 +54,7 @@ namespace picoro {
 //                     --- Steven J. Simmons
 
 template <typename... Coroutines>
-void run_event_loop(async_context_t* context,
-                    Coroutines... toplevel_coroutines);
+void run_event_loop(async_context_t* context, Coroutines... toplevel_coroutines);
 
 // Implementations
 // ===============

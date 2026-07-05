@@ -127,17 +127,16 @@ struct SHT3x {
 
   explicit SHT3x(async_context_t*, uint8_t i2c_address = 0x44);
 
-  Coroutine<int16_t> measure_single_shot_high_repeatability(
-      float* temperature_celsius, float* humidity_percent);
+  Coroutine<int16_t> measure_single_shot_high_repeatability(float* temperature_celsius,
+                                                            float* humidity_percent);
 };
 
-inline SHT3x::SHT3x(async_context_t* context, uint8_t i2c_address)
-    : context(context) {
+inline SHT3x::SHT3x(async_context_t* context, uint8_t i2c_address) : context(context) {
   device.address = i2c_address;
 }
 
-inline Coroutine<int16_t> SHT3x::measure_single_shot_high_repeatability(
-    float* temperature_celsius, float* humidity_percent) {
+inline Coroutine<int16_t> SHT3x::measure_single_shot_high_repeatability(float* temperature_celsius,
+                                                                        float* humidity_percent) {
   uint8_t buffer[6] = {};
   const uint16_t offset = i2c::add_command_to_buffer(buffer, 0, 0x2400);
   int16_t error = i2c::write_data(device, buffer, offset);

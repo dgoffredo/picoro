@@ -2,7 +2,7 @@
 BasedOnStyle: Google
 ---
 Language: Cpp
-ColumnLimit: 80
+ColumnLimit: 100
 
 # Don't mess with block comments.
 ReflowComments: false

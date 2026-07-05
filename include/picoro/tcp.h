@@ -172,8 +172,7 @@ class Connection {
  private:
   std::unique_ptr<State> state_;
 
-  static err_t on_recv(void* user_data, tcp_pcb* client_pcb, pbuf* buffer,
-                       err_t error);
+  static err_t on_recv(void* user_data, tcp_pcb* client_pcb, pbuf* buffer, err_t error);
   static err_t on_sent(void* user_data, tcp_pcb* client_pcb, u16_t length);
   static void on_err(void* user_data, err_t err);
 
@@ -286,8 +285,7 @@ inline const char* lwip_describe(err_t error) {
 
 // class Listener
 // --------------
-inline Listener::Listener(int port, int backlog)
-    : state_(std::make_unique<Listener::State>()) {
+inline Listener::Listener(int port, int backlog) : state_(std::make_unique<Listener::State>()) {
   state_->error = ERR_OK;
   state_->pcb = nullptr;
   state_->backlog = backlog;
@@ -301,8 +299,7 @@ inline Listener::Listener(int port, int backlog)
   if ((state_->error = tcp_bind(state_->pcb, IP_ADDR_ANY, port))) {
     return;
   }
-  state_->pcb =
-      tcp_listen_with_backlog_and_err(state_->pcb, backlog, &state_->error);
+  state_->pcb = tcp_listen_with_backlog_and_err(state_->pcb, backlog, &state_->error);
   if (state_->error) {
     return;
   }
@@ -348,8 +345,7 @@ inline err_t Listener::close() {
 
 inline err_t Listener::error() const { return state_->error; }
 
-inline err_t Listener::on_accept(void* user_data, tcp_pcb* client_pcb,
-                                 err_t error) {
+inline err_t Listener::on_accept(void* user_data, tcp_pcb* client_pcb, err_t error) {
   debug("in Listener::on_accept\n");
   auto* state = static_cast<Listener::State*>(user_data);
 
@@ -434,8 +430,7 @@ inline Connection::Connection(tcp_pcb* client_pcb) {
 
 inline Connection::~Connection() { (void)close(); }
 
-inline err_t Connection::on_recv(void* user_data, tcp_pcb* client_pcb,
-                                 pbuf* buffer, err_t error) {
+inline err_t Connection::on_recv(void* user_data, tcp_pcb* client_pcb, pbuf* buffer, err_t error) {
   debug("in Connection::on_recv\n");
   auto* state = static_cast<Connection::State*>(user_data);
   assert(client_pcb == state->client_pcb);
@@ -452,8 +447,8 @@ inline err_t Connection::on_recv(void* user_data, tcp_pcb* client_pcb,
 
   if (error || buffer == nullptr) {
     // error or connection closed
-    debug("on_recv: error or connection closed. error: %s buffer: %p\n",
-          lwip_describe(error), buffer);
+    debug("on_recv: error or connection closed. error: %s buffer: %p\n", lwip_describe(error),
+          buffer);
     // TODO: Can `buffer` have data in it if `error != ERR_OK`? If so, should
     // we deliver the data to receivers?
     while (!state->receivers.empty()) {
@@ -481,8 +476,8 @@ inline err_t Connection::on_recv(void* user_data, tcp_pcb* client_pcb,
   const std::size_t old_size = received.size();
   received.resize(old_size + buffer->tot_len);
   const u16_t buffer_offset = 0;
-  const u16_t copied = pbuf_copy_partial(buffer, received.data() + old_size,
-                                         buffer->tot_len, buffer_offset);
+  const u16_t copied =
+      pbuf_copy_partial(buffer, received.data() + old_size, buffer->tot_len, buffer_offset);
   received.resize(old_size + copied);
   debug("receive buffer is now: %s\n", received.c_str());
   // Deal out data from the beginning of `received` until we're either out of
@@ -490,8 +485,7 @@ inline err_t Connection::on_recv(void* user_data, tcp_pcb* client_pcb,
   std::size_t i = 0;
   while (i < received.size() && !state->receivers.empty()) {
     RecvAwaiter* receiver = state->receivers.front();
-    const auto to_copy =
-        std::min<std::size_t>(receiver->length, received.size() - i);
+    const auto to_copy = std::min<std::size_t>(receiver->length, received.size() - i);
     std::copy_n(received.begin() + i, to_copy, receiver->destination);
     i += to_copy;
     receiver->received += to_copy;
@@ -528,8 +522,7 @@ inline err_t Connection::on_sent(void* user_data, tcp_pcb*, u16_t length) {
 }
 
 inline void Connection::on_err(void* user_data, err_t error) {
-  debug("in Connection::on_err. user_data: %p error: %s\n", user_data,
-        lwip_describe(error));
+  debug("in Connection::on_err. user_data: %p error: %s\n", user_data, lwip_describe(error));
   auto* state = static_cast<Connection::State*>(user_data);
 
   // The pcb is already freed (per lwIP's documentation), so set it to null in
@@ -597,13 +590,8 @@ inline err_t Connection::close() {
 
 // class RecvAwaiter
 // -----------------
-inline RecvAwaiter::RecvAwaiter(Connection::State* connection,
-                                char* destination, int size)
-    : connection(connection),
-      destination(destination),
-      length(size),
-      received(0),
-      error(ERR_OK) {
+inline RecvAwaiter::RecvAwaiter(Connection::State* connection, char* destination, int size)
+    : connection(connection), destination(destination), length(size), received(0), error(ERR_OK) {
   debug("in RecvAwaiter constructor\n");
   // If `connection` is null, we return (0, ERR_CLSD) without suspending.
   if (!connection) {
@@ -617,8 +605,7 @@ inline RecvAwaiter::RecvAwaiter(Connection::State* connection,
   // suspend.
   if (connection->receivers.empty()) {
     debug("in RecvAwaiter constructor: no other receivers\n");
-    const auto to_consume =
-        std::min<std::size_t>(connection->received.size(), size);
+    const auto to_consume = std::min<std::size_t>(connection->received.size(), size);
     debug("RecvAwaiter constructor: going to consume %u bytes\n", to_consume);
     std::copy_n(connection->received.begin(), to_consume, destination);
     debug("RecvAwaiter constructor: returned from copy_n\n");
@@ -638,8 +625,7 @@ inline bool RecvAwaiter::await_ready() {
 }
 
 void RecvAwaiter::await_suspend(std::coroutine_handle<> continuation) {
-  debug("RecvAwaiter::await_suspend. this: %p, connection: %p\n", this,
-        connection);
+  debug("RecvAwaiter::await_suspend. this: %p, connection: %p\n", this, connection);
   this->continuation = continuation;
   assert(connection);
   connection->receivers.push(this);
@@ -653,15 +639,10 @@ inline std::tuple<int, err_t> RecvAwaiter::await_resume() {
 
 // class SendAwaiter
 // -----------------
-inline SendAwaiter::SendAwaiter(Connection::State* connection,
-                                std::string_view data)
-    : connection(connection),
-      length(data.size()),
-      remaining(data.size()),
-      error(ERR_OK) {
-  debug(
-      "in SendAwaiter constructor. connection: %p data.size(): %u data: %.*s\n",
-      connection, data.size(), int(data.size()), data.data());
+inline SendAwaiter::SendAwaiter(Connection::State* connection, std::string_view data)
+    : connection(connection), length(data.size()), remaining(data.size()), error(ERR_OK) {
+  debug("in SendAwaiter constructor. connection: %p data.size(): %u data: %.*s\n", connection,
+        data.size(), int(data.size()), data.data());
   // If `connection` is null or disconnecting, we return (0, ERR_CLSD) without suspending.
   if (!connection || TCP_STATE_IS_CLOSING(connection->client_pcb->state)) {
     error = ERR_CLSD;
@@ -681,8 +662,7 @@ inline SendAwaiter::SendAwaiter(Connection::State* connection,
     debug(
         "in SendAwaiter constructor. tcp_output returned %s and the PCB state "
         "is %s\n",
-        lwip_describe(error),
-        tcp_debug_state_str(connection->client_pcb->state));
+        lwip_describe(error), tcp_debug_state_str(connection->client_pcb->state));
   }
 }
 
@@ -699,8 +679,8 @@ inline void SendAwaiter::await_suspend(std::coroutine_handle<> continuation) {
 }
 
 inline std::tuple<int, err_t> SendAwaiter::await_resume() {
-  debug("in SendAwaiter::await_resume() returning (%d, %s)\n",
-        length - remaining, lwip_describe(error));
+  debug("in SendAwaiter::await_resume() returning (%d, %s)\n", length - remaining,
+        lwip_describe(error));
   return {length - remaining, error};
 }
 
