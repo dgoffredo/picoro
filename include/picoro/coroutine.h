@@ -251,7 +251,6 @@ class Awaiter<void> {
 // --------------------
 template <typename Ret>
 void Coroutine<Ret>::Deleter::operator()(Promise<Ret>* promise) {
-  debug("Destroying a Promise at address %p\n", promise);
   std::coroutine_handle<Promise<Ret>>::from_promise(*promise).destroy();
 }
 
