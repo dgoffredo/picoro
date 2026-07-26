@@ -235,7 +235,7 @@ class Sensor {
 // When a `Driver` is destroyed, it uninstalls itself via
 // `driver_at_core[get_core_num()] = nullptr;`.
 // Each CPU core can have at most one `Driver` at a time.
-inline Driver* driver_at_core[2] = {};
+inline Driver* driver_at_core[NUM_CORES] = {};
 
 // class Driver
 // ------------

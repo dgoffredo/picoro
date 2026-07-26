@@ -30,6 +30,15 @@ target_link_libraries(picoro_event_loop INTERFACE
   pico_async_context_poll
 )
 
+add_library(picoro_gpio INTERFACE)
+target_link_libraries(picoro_gpio INTERFACE
+  picoro_headers
+  picoro_debug
+  pico_async_context_poll
+  pico_time
+  hardware_gpio
+)
+
 add_library(picoro_sleep INTERFACE)
 target_link_libraries(picoro_sleep INTERFACE
   picoro_headers

@@ -13,12 +13,15 @@
 //       picoro::debug("This only prints in %s mode.\n", "release");
 //     }
 
+#ifndef NDEBUG
+#include <stdio.h>
+#endif
+
 namespace picoro {
 
 #ifdef NDEBUG
 inline int debug(const char*, ...) { return 0; }
 #else
-#include <stdio.h>
 // The use of a template will cause overloads to proliferate, but it's cleaner
 // than using <cstdarg> and will probably get inlined away.
 template <typename... Parameters>
