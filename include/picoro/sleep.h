@@ -36,6 +36,8 @@
 //       // unreachable
 //     }
 
+#include <picoro/debug.h>
+
 #include <pico/async_context.h>
 #include <pico/time.h>
 
@@ -94,13 +96,23 @@ inline void Sleep::await_suspend(std::coroutine_handle<> coroutine) {
   continuation = coroutine;
   worker.do_work = &Sleep::on_expire;
   worker.user_data = this;
-  (void)async_context_add_at_time_worker_at(context, &worker, deadline);
+  const bool added = async_context_add_at_time_worker_at(context, &worker, deadline);
+  if (!added) {
+    // The SDK refuses to add a worker whose pointer is already in its
+    // at-time list -- see async_context_base_add_at_time_worker(). If this
+    // ever fires, `worker`'s address (reused from some earlier, still-
+    // registered Sleep that never fired) collided with this one, and this
+    // timer was just silently dropped instead of scheduled.
+    picoro::debug("Sleep::await_suspend: worker %p was already registered -- this sleep_for will never resume!\n",
+                  static_cast<void*>(&worker));
+  }
 }
 
 inline void Sleep::await_resume() {}
 
 inline void Sleep::on_expire(async_context_t*, async_at_time_worker_t* worker) {
   auto* sleep = static_cast<Sleep*>(worker->user_data);
+  picoro::debug("Resuming Sleep at address %p\n", sleep);
   sleep->continuation.resume();
 }
 

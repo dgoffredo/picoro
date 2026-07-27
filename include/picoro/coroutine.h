@@ -121,8 +121,16 @@ class Awaiter;
 template <typename Ret>
 class Promise;
 
+// `[[nodiscard]]`: `Coroutine` has no initial suspend, so calling a
+// `Coroutine`-returning function starts it running immediately. If the
+// returned `Coroutine` is neither `co_await`ed nor `.detach()`ed, it's
+// destroyed at the end of the full expression -- even mid-flight, at whatever
+// `co_await` it's currently suspended at -- which both truncates the
+// coroutine and leaves any awaiter it registered (e.g. a `Sleep`'s pending
+// timer) pointing at freed memory. `[[nodiscard]]` catches the mistake at
+// compile time instead.
 template <typename Ret>
-class Coroutine {
+class [[nodiscard]] Coroutine {
  public:
   struct Deleter {
     void operator()(Promise<Ret>*);
