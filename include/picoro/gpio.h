@@ -128,6 +128,10 @@ void handle_gpio_irq(unsigned gpio, std::uint32_t event_mask) {
 
     if ((next_write + 1) % std::size(events) == next_read) {
         skipped += 1;
+        // Still nudge the context. Dropping the event is fine, but dropping
+        // the wakeup too is not: if no drain is already scheduled, nothing
+        // would ever empty the queue and this pin would wedge for good.
+        async_context_set_work_pending(static_cast<async_context_t*>(worker.user_data), &worker);
         return;
     }
 
