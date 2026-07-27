@@ -3,6 +3,7 @@
 // TODO: documentation
 
 #include <hardware/gpio.h>
+#include <hardware/irq.h>
 #include <pico/async_context.h>
 #include <pico/time.h>
 
@@ -93,6 +94,11 @@ void gpio_subscribe(async_context_t* ctx, unsigned gpio, GPIOSubscriber& subscri
         async_context_add_when_pending_worker(ctx, &ptr->worker);
         gpio_set_irq_callback(&handle_gpio_irq); // potentially redundant, but harmless
         gpio_set_irq_enabled(gpio, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true);
+        // Neither of the two calls above enables the bank's interrupt in the
+        // NVIC -- only gpio_set_irq_enabled_with_callback() does that. Without
+        // this we'd be relying on some other library (the cyw43 driver, say)
+        // having enabled it for us.
+        irq_set_enabled(IO_IRQ_BANK0, true);
         return;
     }
 
