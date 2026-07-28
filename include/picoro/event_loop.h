@@ -67,27 +67,12 @@ void run_event_loop(async_context_t* context, Coroutines...) {
   // The `Coroutines...` don't need names.  `picoro::Coroutine` is eagerly
   // started, so the `Coroutines...` parameters serve only to provide a place
   // for those coroutine objects to live while the event loop runs.
-  // DIAGNOSTIC (temporary): busy-poll instead of waiting, to test whether the
-  // intermittent hang lives in async_context_wait_for_work_ms()'s WFE path.
-  // That path can take a bare __wfe() with no hardware alarm armed -- see
-  // best_effort_wfe_or_timeout() in the SDK's time.c -- in which case only an
-  // unrelated interrupt (a button press) ever wakes us. If the hang vanishes
-  // here, that's the culprit. Restore the wait afterwards: this spins the CPU
-  // at 100%.
-  //
-  // The per-iteration "{"/"}" tracing is off for the same reason: at busy-poll
-  // rates it floods the log and changes the timing we're trying to measure.
-  /*
-  for (;;) {
-    async_context_poll(context);
-  }
-  */
   for (;;) {
     debug("{");
     async_context_poll(context);
     debug("}");
-    debug(" next_time in %lld us\n",
-          (long long)absolute_time_diff_us(get_absolute_time(), context->next_time));
+    // debug(" next_time in %lld us\n",
+    //       (long long)absolute_time_diff_us(get_absolute_time(), context->next_time));
     async_context_wait_for_work_ms(context, 10 * 1000);
   }
 }

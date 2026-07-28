@@ -26,7 +26,11 @@ inline int debug(const char*, ...) { return 0; }
 // than using <cstdarg> and will probably get inlined away.
 template <typename... Parameters>
 int debug(const char* format, Parameters... parameters) {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-security"
   const int rc = printf(format, parameters...);
+#pragma GCC diagnostic pop
+
   fflush(stdout);
   return rc;
 }
