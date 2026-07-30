@@ -112,7 +112,6 @@ inline void Sleep::await_resume() {}
 
 inline void Sleep::on_expire(async_context_t*, async_at_time_worker_t* worker) {
   auto* sleep = static_cast<Sleep*>(worker->user_data);
-  picoro::debug("Resuming Sleep at address %p\n", sleep);
   sleep->continuation.resume();
 }
 

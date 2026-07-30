@@ -3,7 +3,6 @@
 // TODO
 
 #include <coroutine>
-#include <new>
 #include <utility>
 
 namespace picoro {
@@ -37,7 +36,7 @@ class NextAwaitable;
 
 template <typename Value>
 class Broadcaster {
-  Waiter<Value>* head_;
+  Waiter<Value>* head_ = nullptr;
 
  public:
   void publish(const Value& value);
@@ -48,9 +47,7 @@ template <typename Value>
 struct Waiter {
   Waiter* next;
   std::coroutine_handle<> continuation;
-  alignas(Value) char buffer[sizeof(Value)];
-
-  ~Waiter();
+  const Value* source;
 };
 
 template <typename Value>
@@ -75,7 +72,7 @@ void Broadcaster<Value>::publish(const Value& value) {
   Waiter<Value>* waiter = std::exchange(head_, nullptr);
   while (waiter) {
     Waiter<Value>* next = waiter->next;
-    new (waiter->buffer) Value(value);
+    waiter->source = &value;
     waiter->continuation();
     waiter = next;
   }
@@ -84,13 +81,6 @@ void Broadcaster<Value>::publish(const Value& value) {
 template <typename Value>
 NextAwaitable<Value> Broadcaster<Value>::next() {
   return NextAwaitable<Value>(head_);
-}
-
-// struct Waiter<Value>
-// --------------------
-template <typename Value>
-Waiter<Value>::~Waiter() {
-  std::launder(reinterpret_cast<Value*>(buffer))->~Value();
 }
 
 // class NextAwaitable<Value>
@@ -113,7 +103,7 @@ void NextAwaitable<Value>::await_suspend(std::coroutine_handle<> continuation) {
 
 template <typename Value>
 Value NextAwaitable<Value>::await_resume() {
-  return std::move(*std::launder(reinterpret_cast<Value*>(waiter_.buffer)));
+  return *waiter_.source;
 }
 
 }  // namespace picoro
