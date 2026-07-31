@@ -14,22 +14,22 @@
 //     }
 
 #ifndef NDEBUG
+#include <stdarg.h>
 #include <stdio.h>
 #endif
 
 namespace picoro {
 
 #ifdef NDEBUG
+__attribute__((format(printf, 1, 2)))
 inline int debug(const char*, ...) { return 0; }
 #else
-// The use of a template will cause overloads to proliferate, but it's cleaner
-// than using <cstdarg> and will probably get inlined away.
-template <typename... Parameters>
-int debug(const char* format, Parameters... parameters) {
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wformat-security"
-  const int rc = printf(format, parameters...);
-#pragma GCC diagnostic pop
+__attribute__((format(printf, 1, 2)))
+inline int debug(const char* format, ...) {
+  va_list args;
+  va_start(args, format);
+  const int rc = vprintf(format, args);
+  va_end(args);
 
   fflush(stdout);
   return rc;
